@@ -1,0 +1,43 @@
+demo/index.html
+  d14ab0da72882a06 1-346
+specs/SPEC.md
+  d14ab0da72882a06 1-72
+.gitignore
+  d14ab0da72882a06 1-6
+specs/IDEAS.md
+  d14ab0da72882a06 1-53
+vite.config.ts
+  d14ab0da72882a06 1-28
+tsconfig.json
+  d14ab0da72882a06 1-20
+src/index.ts
+  d14ab0da72882a06 1-378
+.claude/CLAUDE.md
+  d14ab0da72882a06 1-31
+vite.demo.config.ts
+  d14ab0da72882a06 1-16
+LICENSE
+  d14ab0da72882a06 1-21
+package.json
+  d14ab0da72882a06 1-56,59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.37",
+  "base_commit_sha": "02760aef8c211516c9d16eb64ea58b833339ac8b",
+  "prompts": {
+    "d14ab0da72882a06": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d4dfba95-7d3f-48c8-ba81-6663cff492b7",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Francois Laberge <francoislaberge@gmail.com>",
+      "messages": [],
+      "total_additions": 1538,
+      "total_deletions": 53,
+      "accepted_lines": 1484,
+      "overriden_lines": 1
+    }
+  }
+}
