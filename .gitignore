@@ -1,0 +1,6 @@
+node_modules/
+dist/
+dist-demo/
+*.log
+.DS_Store
+.context/

@@ -1,0 +1,59 @@
+{
+  "name": "slowmo",
+  "version": "0.1.0",
+  "description": "Universal slow-motion control for web animations - CSS, videos, GSAP, Three.js, and more",
+  "type": "module",
+  "main": "./dist/slowmo.cjs",
+  "module": "./dist/slowmo.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/slowmo.js",
+      "require": "./dist/slowmo.cjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite demo",
+    "build": "vite build",
+    "build:demo": "vite build --config vite.demo.config.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "animation",
+    "slow-motion",
+    "slowmo",
+    "debug",
+    "css-animation",
+    "gsap",
+    "three.js",
+    "video",
+    "framer-motion"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.11",
+    "vite-plugin-dts": "^3.7.1",
+    "vitest": "^1.2.1",
+    "jsdom": "^24.0.0",
+    "@vitest/coverage-v8": "^1.2.1"
+  },
+  "peerDependencies": {
+    "gsap": ">=3.0.0"
+  },
+  "peerDependenciesMeta": {
+    "gsap": {
+      "optional": true
+    }
+  },
+  "packageManager": "pnpm@10.24.0+sha512.01ff8ae71b4419903b65c60fb2dc9d34cf8bb6e06d03bde112ef38f7a34d6904c424ba66bea5cdcf12890230bf39f9580473140ed9c946fef328b6e5238a345a"
+}
