@@ -209,11 +209,11 @@
       opacity: 0.7;
     }
 
-    /* Floating Controller */
+    /* Controller + Quick Start Section */
     .controller-section {
       position: relative;
-      padding: 3rem 0;
-      margin-bottom: 3rem;
+      padding: 2rem 0;
+      margin-bottom: 2rem;
     }
 
     .controller-section h2 {
@@ -223,107 +223,31 @@
       text-transform: uppercase;
       letter-spacing: 0.1em;
       color: var(--text-dim);
-      margin-bottom: 1.5rem;
+      margin-bottom: 1rem;
     }
 
     .controller-wrapper {
       display: flex;
       justify-content: center;
+      margin-bottom: 1.5rem;
     }
 
     /* The actual controller - reusable component */
     .slowmo-controller {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.375rem;
       background: var(--bg-elevated);
       border: 1px solid var(--border);
       border-radius: 100px;
-      padding: 0.5rem;
+      padding: 0.375rem 0.5rem;
       box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.03);
       user-select: none;
-    }
-
-    .controller-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 36px;
-      height: 36px;
-      border: none;
-      background: transparent;
-      border-radius: 50%;
-      cursor: pointer;
-      color: var(--text-muted);
-      transition: all 0.15s;
-    }
-
-    .controller-btn:hover {
-      background: var(--bg-hover);
-      color: var(--text);
-    }
-
-    .controller-btn.active {
-      background: var(--accent);
-      color: var(--bg);
-    }
-
-    .controller-btn svg {
-      width: 18px;
-      height: 18px;
-    }
-
-    .controller-speed {
-      display: flex;
-      align-items: center;
-      gap: 0.25rem;
-      padding: 0 0.5rem;
-      min-width: 80px;
-      justify-content: center;
-    }
-
-    .speed-value {
-      font-family: var(--font-mono);
-      font-size: 1rem;
-      font-weight: 500;
-      color: var(--text);
-      min-width: 48px;
-      text-align: center;
-    }
-
-    .speed-controls {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .speed-arrow {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 20px;
-      height: 14px;
-      border: none;
-      background: transparent;
-      cursor: pointer;
-      color: var(--text-dim);
-      transition: color 0.15s;
-      padding: 0;
-    }
-
-    .speed-arrow:hover {
-      color: var(--text);
-    }
-
-    .speed-arrow svg {
-      width: 12px;
-      height: 12px;
     }
 
     .controller-presets {
       display: flex;
       gap: 2px;
-      padding: 0 0.25rem;
     }
 
     .preset-btn {
@@ -347,6 +271,72 @@
       background: var(--accent-glow);
       color: var(--accent);
     }
+
+    .preset-btn.skip {
+      font-family: var(--font-sans);
+      font-size: 0.875rem;
+    }
+
+    .controller-playpause {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border: none;
+      background: var(--accent);
+      border-radius: 50%;
+      cursor: pointer;
+      color: var(--bg);
+      transition: all 0.15s;
+      margin: 0 0.25rem;
+    }
+
+    .controller-playpause:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
+
+    .controller-playpause svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* Quick Start inline */
+    .quick-start-inline {
+      max-width: 400px;
+      margin: 0 auto;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+    }
+
+    .quick-start-inline h3 {
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-dim);
+      margin-bottom: 0.75rem;
+    }
+
+    .quick-start-inline pre {
+      margin: 0;
+    }
+
+    .quick-start-inline code {
+      font-family: var(--font-mono);
+      font-size: 0.8125rem;
+      line-height: 1.7;
+      color: var(--text-muted);
+    }
+
+    .quick-start-inline .keyword { color: #c084fc; }
+    .quick-start-inline .string { color: #4ade80; }
+    .quick-start-inline .function { color: #60a5fa; }
+    .quick-start-inline .number { color: var(--accent); }
+    .quick-start-inline .comment { color: var(--text-dim); }
 
     /* Demo Grid */
     .demos-section {
@@ -457,144 +447,6 @@
       object-fit: cover;
     }
 
-    /* Game Demo */
-    .game-section {
-      margin-bottom: 4rem;
-    }
-
-    .game-section h2 {
-      font-size: 0.75rem;
-      font-weight: 500;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--text-dim);
-      margin-bottom: 1.5rem;
-    }
-
-    .game-container {
-      background: var(--bg-elevated);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-    }
-
-    .game-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 1rem 1.25rem;
-      border-bottom: 1px solid var(--border-subtle);
-    }
-
-    .game-header h3 {
-      font-size: 0.9375rem;
-      font-weight: 600;
-    }
-
-    .game-header p {
-      font-size: 0.8125rem;
-      color: var(--text-muted);
-    }
-
-    /* Difficulty controller */
-    .difficulty-controller {
-      display: flex;
-      align-items: center;
-      gap: 0.375rem;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 100px;
-      padding: 0.25rem;
-    }
-
-    .diff-btn {
-      padding: 0.375rem 0.75rem;
-      border: none;
-      background: transparent;
-      border-radius: 100px;
-      cursor: pointer;
-      font-size: 0.75rem;
-      font-weight: 500;
-      color: var(--text-dim);
-      transition: all 0.15s;
-    }
-
-    .diff-btn:hover {
-      color: var(--text-muted);
-    }
-
-    .diff-btn.active {
-      background: var(--accent);
-      color: var(--bg);
-    }
-
-    .game-canvas-wrapper {
-      position: relative;
-      height: 300px;
-      background: linear-gradient(180deg, var(--bg) 0%, #18181b 100%);
-    }
-
-    #game-canvas {
-      width: 100%;
-      height: 100%;
-      display: block;
-    }
-
-    .game-overlay {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background: rgba(12, 10, 9, 0.85);
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.2s;
-    }
-
-    .game-overlay.visible {
-      opacity: 1;
-      pointer-events: auto;
-    }
-
-    .game-overlay h4 {
-      font-size: 1.5rem;
-      font-weight: 600;
-      margin-bottom: 0.5rem;
-    }
-
-    .game-overlay p {
-      color: var(--text-muted);
-      margin-bottom: 1.5rem;
-    }
-
-    .game-btn {
-      padding: 0.625rem 1.25rem;
-      background: var(--accent);
-      border: none;
-      border-radius: 100px;
-      cursor: pointer;
-      font-size: 0.875rem;
-      font-weight: 500;
-      color: var(--bg);
-      transition: transform 0.1s, box-shadow 0.15s;
-    }
-
-    .game-btn:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px var(--accent-glow);
-    }
-
-    .game-score {
-      position: absolute;
-      top: 1rem;
-      left: 1rem;
-      font-family: var(--font-mono);
-      font-size: 0.875rem;
-      color: var(--text-muted);
-    }
-
     /* API Section */
     .api-section {
       margin-bottom: 4rem;
@@ -666,6 +518,29 @@
 
     .api-card code .comment {
       color: var(--text-dim);
+    }
+
+    /* Credits */
+    .credits {
+      text-align: center;
+      padding: 2rem 0;
+      margin-bottom: 2rem;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .credits p {
+      font-size: 0.8125rem;
+      color: var(--text-dim);
+    }
+
+    .credits a {
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    .credits a:hover {
+      color: var(--accent);
     }
 
     /* Footer */
@@ -836,43 +711,39 @@
       </div>
     </section>
 
-    <!-- Controller -->
+    <!-- Quick Start -->
+    <section class="controller-section fade-up">
+      <h2>Quick Start</h2>
+      <div class="quick-start-inline">
+        <pre><code><span class="function">slowmo</span>(<span class="number">0.5</span>);  <span class="comment">// Half speed</span>
+<span class="comment">// slowmo(2);   // Double speed</span>
+<span class="comment">// slowmo(1);   // Normal speed</span></code></pre>
+      </div>
+    </section>
+
+    <!-- Try It Controller -->
     <section class="controller-section fade-up">
       <h2>Try It</h2>
       <div class="controller-wrapper">
         <div class="slowmo-controller" id="main-controller">
-          <button class="controller-btn" id="pause-btn" title="Pause">
-            <svg class="play-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
-              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          <div class="controller-presets slow-presets">
+            <button class="preset-btn" data-speed="0.1">.1x</button>
+            <button class="preset-btn" data-speed="0.25">.25x</button>
+            <button class="preset-btn" data-speed="0.5">.5x</button>
+          </div>
+          <button class="controller-playpause" id="pause-btn" title="Pause">
+            <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor" style="display:none">
+              <polygon points="6 3 20 12 6 21 6 3"></polygon>
             </svg>
             <svg class="pause-icon" viewBox="0 0 24 24" fill="currentColor">
               <rect x="6" y="4" width="4" height="16" rx="1"></rect>
               <rect x="14" y="4" width="4" height="16" rx="1"></rect>
             </svg>
           </button>
-
-          <div class="controller-speed">
-            <span class="speed-value" id="speed-display">1.0x</span>
-            <div class="speed-controls">
-              <button class="speed-arrow" id="speed-up" title="Faster">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="18 15 12 9 6 15"></polyline>
-                </svg>
-              </button>
-              <button class="speed-arrow" id="speed-down" title="Slower">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="6 9 12 15 18 9"></polyline>
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          <div class="controller-presets">
-            <button class="preset-btn" data-speed="0.1">0.1x</button>
-            <button class="preset-btn" data-speed="0.25">0.25x</button>
-            <button class="preset-btn" data-speed="0.5">0.5x</button>
+          <div class="controller-presets fast-presets">
             <button class="preset-btn active" data-speed="1">1x</button>
             <button class="preset-btn" data-speed="2">2x</button>
+            <button class="preset-btn skip" id="skip-btn" title="Skip animations">&#8734;</button>
           </div>
         </div>
       </div>
@@ -880,9 +751,6 @@
 
     <!-- Demos -->
     <section class="demos-section fade-up">
-      <div class="section-header">
-        <h2>Live Demos</h2>
-      </div>
       <div class="demos-grid">
         <div class="demo-card">
           <div class="demo-visual">
@@ -928,61 +796,31 @@
       </div>
     </section>
 
-    <!-- Game Demo -->
-    <section class="game-section fade-up">
-      <h2>Game Difficulty Demo</h2>
-      <div class="game-container">
-        <div class="game-header">
-          <div>
-            <h3>Dodge the Blocks</h3>
-            <p>Use arrow keys or tap to move. Slower = easier, faster = harder.</p>
-          </div>
-          <div class="difficulty-controller">
-            <button class="diff-btn" data-speed="0.5">Easy</button>
-            <button class="diff-btn active" data-speed="1">Normal</button>
-            <button class="diff-btn" data-speed="1.5">Hard</button>
-            <button class="diff-btn" data-speed="2">Insane</button>
-          </div>
+    <!-- API -->
+    <section class="api-section fade-up">
+      <h2>API Reference</h2>
+      <div class="api-grid">
+        <div class="api-card">
+          <h3>Install</h3>
+          <pre><code><span class="keyword">import</span> { slowmo } <span class="keyword">from</span> <span class="string">"slowmo"</span>;
+
+slowmo(<span class="number">0.5</span>);  <span class="comment">// Any speed</span>
+slowmo(<span class="number">0</span>);    <span class="comment">// Pause</span></code></pre>
         </div>
-        <div class="game-canvas-wrapper">
-          <canvas id="game-canvas"></canvas>
-          <div class="game-score">Score: <span id="game-score-value">0</span></div>
-          <div class="game-overlay visible" id="game-overlay">
-            <h4 id="overlay-title">Dodge the Blocks</h4>
-            <p id="overlay-message">Arrow keys or tap sides to move</p>
-            <button class="game-btn" id="game-start-btn">Start Game</button>
-          </div>
+
+        <div class="api-card">
+          <h3>Methods</h3>
+          <pre><code>slowmo.<span class="function">pause</span>();
+slowmo.<span class="function">play</span>();
+slowmo.<span class="function">reset</span>();       <span class="comment">// Back to 1x</span>
+slowmo.<span class="function">getSpeed</span>();    <span class="comment">// Current</span></code></pre>
         </div>
       </div>
     </section>
 
-    <!-- API -->
-    <section class="api-section fade-up">
-      <h2>Quick Start</h2>
-      <div class="api-grid">
-        <div class="api-card">
-          <h3>Basic Usage</h3>
-          <pre><code><span class="keyword">import</span> { slowmo } <span class="keyword">from</span> <span class="string">"slowmo"</span>;
-
-<span class="comment">// Half speed</span>
-<span class="function">slowmo</span>(<span class="number">0.5</span>);
-
-<span class="comment">// Double speed</span>
-<span class="function">slowmo</span>(<span class="number">2</span>);
-
-<span class="comment">// Pause</span>
-<span class="function">slowmo</span>(<span class="number">0</span>);</code></pre>
-        </div>
-
-        <div class="api-card">
-          <h3>Full API</h3>
-          <pre><code>slowmo.<span class="function">setSpeed</span>(<span class="number">0.5</span>);
-slowmo.<span class="function">pause</span>();
-slowmo.<span class="function">play</span>();
-slowmo.<span class="function">reset</span>();
-slowmo.<span class="function">getSpeed</span>();</code></pre>
-        </div>
-      </div>
+    <!-- Credits -->
+    <section class="credits fade-up">
+      <p>Inspired by <a href="https://github.com/AgnitionTeam/agentation" target="_blank" rel="noopener">agentation</a> by <a href="https://x.com/intent/follow?screen_name=BenjiTaylor" target="_blank" rel="noopener">Benji Taylor</a></p>
     </section>
 
     <!-- Footer -->
@@ -1030,34 +868,17 @@ slowmo.<span class="function">getSpeed</span>();</code></pre>
     function updateSpeed(speed, paused = false) {
       isPaused = paused;
       currentSpeed = speed;
-
-      if (paused) {
-        slowmo(0);
-        document.getElementById('speed-display').textContent = 'Paused';
-      } else {
-        slowmo(speed);
-        document.getElementById('speed-display').textContent = speed < 1
-          ? speed.toFixed(2) + 'x'
-          : speed.toFixed(1) + 'x';
-      }
+      slowmo(paused ? 0 : speed);
 
       // Update pause button
       const pauseBtn = document.getElementById('pause-btn');
       const playIcon = pauseBtn.querySelector('.play-icon');
       const pauseIcon = pauseBtn.querySelector('.pause-icon');
+      playIcon.style.display = paused ? 'block' : 'none';
+      pauseIcon.style.display = paused ? 'none' : 'block';
 
-      if (paused) {
-        playIcon.style.display = 'block';
-        pauseIcon.style.display = 'none';
-        pauseBtn.classList.add('active');
-      } else {
-        playIcon.style.display = 'none';
-        pauseIcon.style.display = 'block';
-        pauseBtn.classList.remove('active');
-      }
-
-      // Update preset buttons
-      document.querySelectorAll('.preset-btn').forEach(btn => {
+      // Update preset buttons (only those with data-speed)
+      document.querySelectorAll('.preset-btn[data-speed]').forEach(btn => {
         const btnSpeed = parseFloat(btn.dataset.speed);
         btn.classList.toggle('active', btnSpeed === speed && !paused);
       });
@@ -1065,38 +886,27 @@ slowmo.<span class="function">getSpeed</span>();</code></pre>
 
     // Pause button
     document.getElementById('pause-btn').addEventListener('click', () => {
-      if (isPaused) {
-        updateSpeed(currentSpeed, false);
-      } else {
-        updateSpeed(currentSpeed, true);
+      updateSpeed(currentSpeed, !isPaused);
+    });
+
+    // Skip button - finish all animations
+    document.getElementById('skip-btn').addEventListener('click', () => {
+      // Finish all Web Animations
+      if (typeof document.getAnimations === 'function') {
+        document.getAnimations().forEach(anim => {
+          try { anim.finish(); } catch (e) { try { anim.cancel(); } catch (e2) {} }
+        });
       }
+      // Flash the button
+      const btn = document.getElementById('skip-btn');
+      btn.style.background = 'var(--accent)';
+      btn.style.color = 'var(--bg)';
+      setTimeout(() => { btn.style.background = ''; btn.style.color = ''; }, 200);
     });
 
-    // Speed up/down buttons
-    document.getElementById('speed-up').addEventListener('click', () => {
-      const currentIndex = speedPresets.findIndex(s => s >= currentSpeed);
-      const nextIndex = Math.min(currentIndex + 1, speedPresets.length - 1);
-      updateSpeed(speedPresets[nextIndex], false);
-    });
-
-    document.getElementById('speed-down').addEventListener('click', () => {
-      const currentIndex = speedPresets.findIndex(s => s >= currentSpeed);
-      const prevIndex = Math.max(currentIndex - 1, 0);
-      updateSpeed(speedPresets[prevIndex], false);
-    });
-
-    // Preset buttons
-    document.querySelectorAll('.preset-btn').forEach(btn => {
+    // Preset buttons (only those with data-speed)
+    document.querySelectorAll('.preset-btn[data-speed]').forEach(btn => {
       btn.addEventListener('click', () => {
-        updateSpeed(parseFloat(btn.dataset.speed), false);
-      });
-    });
-
-    // Difficulty buttons
-    document.querySelectorAll('.diff-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
         updateSpeed(parseFloat(btn.dataset.speed), false);
       });
     });
@@ -1129,149 +939,6 @@ slowmo.<span class="function">getSpeed</span>();</code></pre>
       iterations: Infinity,
       easing: 'ease-in-out'
     });
-
-    // Game
-    const canvas = document.getElementById('game-canvas');
-    const ctx = canvas.getContext('2d');
-    const overlay = document.getElementById('game-overlay');
-    const overlayTitle = document.getElementById('overlay-title');
-    const overlayMessage = document.getElementById('overlay-message');
-    const startBtn = document.getElementById('game-start-btn');
-    const scoreDisplay = document.getElementById('game-score-value');
-
-    let gameRunning = false;
-    let score = 0;
-    let player = { x: 0, y: 0, width: 40, height: 40 };
-    let obstacles = [];
-    let lastObstacleTime = 0;
-
-    function resizeCanvas() {
-      canvas.width = canvas.offsetWidth * window.devicePixelRatio;
-      canvas.height = canvas.offsetHeight * window.devicePixelRatio;
-      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-      player.y = canvas.offsetHeight - 60;
-      player.x = canvas.offsetWidth / 2 - player.width / 2;
-    }
-
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-
-    function startGame() {
-      gameRunning = true;
-      score = 0;
-      obstacles = [];
-      overlay.classList.remove('visible');
-      player.x = canvas.offsetWidth / 2 - player.width / 2;
-      lastObstacleTime = performance.now();
-      gameLoop();
-    }
-
-    function endGame() {
-      gameRunning = false;
-      overlayTitle.textContent = 'Game Over';
-      overlayMessage.textContent = `Score: ${score}`;
-      startBtn.textContent = 'Play Again';
-      overlay.classList.add('visible');
-    }
-
-    function gameLoop(timestamp) {
-      if (!gameRunning) return;
-
-      const width = canvas.offsetWidth;
-      const height = canvas.offsetHeight;
-
-      // Clear
-      ctx.fillStyle = '#0c0a09';
-      ctx.fillRect(0, 0, width, height);
-
-      // Spawn obstacles
-      if (timestamp - lastObstacleTime > 800) {
-        obstacles.push({
-          x: Math.random() * (width - 30),
-          y: -30,
-          width: 30,
-          height: 30,
-          speed: 2 + Math.random() * 2
-        });
-        lastObstacleTime = timestamp;
-      }
-
-      // Update and draw obstacles
-      for (let i = obstacles.length - 1; i >= 0; i--) {
-        const obs = obstacles[i];
-        obs.y += obs.speed;
-
-        // Draw obstacle
-        ctx.fillStyle = '#f472b6';
-        ctx.beginPath();
-        ctx.roundRect(obs.x, obs.y, obs.width, obs.height, 4);
-        ctx.fill();
-
-        // Check collision
-        if (
-          player.x < obs.x + obs.width &&
-          player.x + player.width > obs.x &&
-          player.y < obs.y + obs.height &&
-          player.y + player.height > obs.y
-        ) {
-          endGame();
-          return;
-        }
-
-        // Remove if off screen and add score
-        if (obs.y > height) {
-          obstacles.splice(i, 1);
-          score++;
-          scoreDisplay.textContent = score;
-        }
-      }
-
-      // Draw player
-      ctx.fillStyle = '#f59e0b';
-      ctx.beginPath();
-      ctx.roundRect(player.x, player.y, player.width, player.height, 6);
-      ctx.fill();
-
-      requestAnimationFrame(gameLoop);
-    }
-
-    // Controls
-    const moveSpeed = 8;
-
-    document.addEventListener('keydown', (e) => {
-      if (!gameRunning) return;
-      const width = canvas.offsetWidth;
-
-      if (e.key === 'ArrowLeft') {
-        player.x = Math.max(0, player.x - moveSpeed);
-      } else if (e.key === 'ArrowRight') {
-        player.x = Math.min(width - player.width, player.x + moveSpeed);
-      }
-    });
-
-    // Touch controls
-    canvas.addEventListener('click', (e) => {
-      if (!gameRunning) return;
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const width = canvas.offsetWidth;
-
-      if (x < width / 2) {
-        player.x = Math.max(0, player.x - moveSpeed * 3);
-      } else {
-        player.x = Math.min(width - player.width, player.x + moveSpeed * 3);
-      }
-    });
-
-    startBtn.addEventListener('click', startGame);
-
-    // Initial draw
-    ctx.fillStyle = '#0c0a09';
-    ctx.fillRect(0, 0, canvas.offsetWidth, canvas.offsetHeight);
-    ctx.fillStyle = '#f59e0b';
-    ctx.beginPath();
-    ctx.roundRect(player.x, player.y, player.width, player.height, 6);
-    ctx.fill();
   </script>
 </body>
 </html>

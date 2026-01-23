@@ -155,6 +155,45 @@
     }
   }
 
+  /**
+   * Skip all animations - instantly complete them
+   */
+  function skipAnimations() {
+    if (!isInstalled) install();
+
+    // Finish all Web Animations
+    if (typeof document.getAnimations === 'function') {
+      const animations = document.getAnimations();
+      for (const anim of animations) {
+        const effect = anim.effect;
+        if (effect?.target instanceof Element) {
+          if (effect.target.closest('[data-slowmo-exclude]')) continue;
+        }
+        try {
+          anim.finish();
+        } catch (e) {
+          // Some animations can't be finished (infinite, etc)
+          try {
+            anim.cancel();
+          } catch (e2) {}
+        }
+      }
+    }
+
+    // Seek all media to end
+    const mediaElements = document.querySelectorAll('video, audio');
+    mediaElements.forEach((el) => {
+      if (el.closest('[data-slowmo-exclude]')) return;
+      const media = el;
+      if (media.duration && isFinite(media.duration)) {
+        media.currentTime = media.duration;
+      }
+    });
+
+    // Jump virtual time forward significantly for rAF-based animations
+    virtualTime += 100000; // Jump 100 seconds forward
+  }
+
   // Initialize
   install();
 
@@ -164,9 +203,6 @@
 
   const STORAGE_KEY = 'slowmo-controller-state';
   const POSITION_KEY = 'slowmo-controller-position';
-
-  // Speed presets
-  const speedPresets = [0.1, 0.25, 0.5, 1, 2, 4];
 
   // State
   let uiSpeed = 1;
@@ -215,6 +251,12 @@
 
   // Create UI
   function createUI() {
+    // Wait for body to exist
+    if (!document.body) {
+      setTimeout(createUI, 50);
+      return;
+    }
+
     const position = loadPosition();
 
     // Styles
@@ -249,16 +291,17 @@
         background: var(--bg);
         border: 1px solid var(--border);
         border-radius: 24px;
-        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.03);
         overflow: hidden;
         user-select: none;
-        transition: border-radius 0.2s, width 0.2s;
+        transition: border-radius 0.2s;
       }
 
       .slowmo-ext-container.expanded {
         border-radius: 12px;
       }
 
+      /* Collapsed state - just the clock icon */
       .slowmo-ext-collapsed {
         display: flex;
         align-items: center;
@@ -266,6 +309,7 @@
         width: 48px;
         height: 48px;
         cursor: grab;
+        position: relative;
         transition: background 0.15s;
       }
 
@@ -277,33 +321,28 @@
         cursor: grabbing;
       }
 
-      .slowmo-ext-collapsed.dragging {
-        cursor: grabbing;
-      }
-
       .slowmo-ext-collapsed svg {
         width: 24px;
         height: 24px;
         color: var(--accent);
       }
 
-      .slowmo-ext-collapsed .speed-badge {
+      .slowmo-ext-badge {
         position: absolute;
-        top: 6px;
-        right: 6px;
+        top: 4px;
+        right: 4px;
         font-size: 9px;
         font-weight: 600;
-        color: var(--text);
+        color: var(--text-muted);
         background: var(--bg-hover);
         padding: 2px 4px;
         border-radius: 4px;
-        pointer-events: none;
       }
 
+      /* Expanded state */
       .slowmo-ext-expanded {
         display: none;
         padding: 12px;
-        min-width: 280px;
       }
 
       .slowmo-ext-container.expanded .slowmo-ext-collapsed {
@@ -320,6 +359,7 @@
         justify-content: space-between;
         margin-bottom: 12px;
         cursor: grab;
+        padding: 0 2px;
       }
 
       .slowmo-ext-header:active {
@@ -365,108 +405,33 @@
         height: 14px;
       }
 
+      /* Main controls row: [slow presets] [play/pause] [fast presets + skip] */
       .slowmo-ext-controls {
         display: flex;
         align-items: center;
-        gap: 8px;
-        background: rgba(0, 0, 0, 0.3);
-        border-radius: 100px;
-        padding: 6px;
-      }
-
-      .slowmo-ext-btn {
-        display: flex;
-        align-items: center;
         justify-content: center;
-        width: 32px;
-        height: 32px;
-        border: none;
-        background: transparent;
-        border-radius: 50%;
-        cursor: pointer;
-        color: var(--text-muted);
-        transition: all 0.15s;
-      }
-
-      .slowmo-ext-btn:hover {
-        background: var(--bg-hover);
-        color: var(--text);
-      }
-
-      .slowmo-ext-btn.active {
-        background: var(--accent);
-        color: #000;
-      }
-
-      .slowmo-ext-btn svg {
-        width: 16px;
-        height: 16px;
-      }
-
-      .slowmo-ext-speed {
-        display: flex;
-        align-items: center;
         gap: 4px;
-        padding: 0 8px;
-        min-width: 70px;
-        justify-content: center;
-      }
-
-      .slowmo-ext-speed-value {
-        font-family: 'SF Mono', 'Monaco', monospace;
-        font-size: 14px;
-        font-weight: 500;
-        color: var(--text);
-        min-width: 50px;
-        text-align: center;
-      }
-
-      .slowmo-ext-speed-arrows {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-      }
-
-      .slowmo-ext-arrow {
-        width: 18px;
-        height: 12px;
-        border: none;
-        background: transparent;
-        cursor: pointer;
-        color: var(--text-dim);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-        transition: color 0.15s;
-      }
-
-      .slowmo-ext-arrow:hover {
-        color: var(--text);
-      }
-
-      .slowmo-ext-arrow svg {
-        width: 10px;
-        height: 10px;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 100px;
+        padding: 6px 10px;
       }
 
       .slowmo-ext-presets {
         display: flex;
         gap: 4px;
-        margin-top: 10px;
       }
 
       .slowmo-ext-preset {
-        flex: 1;
-        padding: 6px 8px;
+        padding: 6px 12px;
         border: none;
-        background: rgba(0, 0, 0, 0.3);
-        border-radius: 6px;
+        background: transparent;
+        border-radius: 100px;
         cursor: pointer;
-        font-family: 'SF Mono', 'Monaco', monospace;
-        font-size: 11px;
+        font-family: ui-monospace, 'SF Mono', Monaco, monospace;
+        font-size: 12px;
         color: var(--text-dim);
         transition: all 0.15s;
+        white-space: nowrap;
       }
 
       .slowmo-ext-preset:hover {
@@ -477,6 +442,46 @@
       .slowmo-ext-preset.active {
         background: var(--accent-glow);
         color: var(--accent);
+      }
+
+      .slowmo-ext-preset.skip {
+        font-family: inherit;
+        font-size: 14px;
+        padding: 6px 8px;
+      }
+
+      /* Play/Pause button in the middle */
+      .slowmo-ext-playpause {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border: none;
+        background: var(--accent);
+        border-radius: 50%;
+        cursor: pointer;
+        color: #000;
+        transition: all 0.15s;
+        margin: 0 8px;
+        flex-shrink: 0;
+      }
+
+      .slowmo-ext-playpause:hover {
+        transform: scale(1.05);
+        box-shadow: 0 0 12px var(--accent-glow);
+      }
+
+      .slowmo-ext-playpause svg {
+        width: 16px;
+        height: 16px;
+      }
+
+      .slowmo-ext-divider {
+        width: 1px;
+        height: 20px;
+        background: var(--border);
+        margin: 0 4px;
       }
     `;
     document.head.appendChild(styles);
@@ -491,7 +496,7 @@
             <circle cx="12" cy="12" r="10"></circle>
             <polyline points="12 6 12 12 16 14"></polyline>
           </svg>
-          <span class="speed-badge">${formatSpeed(uiSpeed)}</span>
+          <span class="slowmo-ext-badge">${formatSpeed(uiSpeed)}</span>
         </div>
         <div class="slowmo-ext-expanded">
           <div class="slowmo-ext-header">
@@ -504,41 +509,31 @@
             </span>
             <button class="slowmo-ext-close" title="Collapse">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="4 14 10 14 10 20"></polyline>
-                <polyline points="20 10 14 10 14 4"></polyline>
-                <line x1="14" y1="10" x2="21" y2="3"></line>
-                <line x1="3" y1="21" x2="10" y2="14"></line>
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
               </svg>
             </button>
           </div>
           <div class="slowmo-ext-controls">
-            <button class="slowmo-ext-btn ${uiPaused ? 'active' : ''}" data-action="pause" title="Pause/Play">
-              <svg class="play-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:${uiPaused ? 'block' : 'none'}">
-                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            <div class="slowmo-ext-presets slowmo-ext-slow">
+              <button class="slowmo-ext-preset ${uiSpeed === 0.1 && !uiPaused ? 'active' : ''}" data-speed="0.1">.1x</button>
+              <button class="slowmo-ext-preset ${uiSpeed === 0.25 && !uiPaused ? 'active' : ''}" data-speed="0.25">.25x</button>
+              <button class="slowmo-ext-preset ${uiSpeed === 0.5 && !uiPaused ? 'active' : ''}" data-speed="0.5">.5x</button>
+            </div>
+            <button class="slowmo-ext-playpause" data-action="playpause" title="${uiPaused ? 'Play' : 'Pause'}">
+              <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor" style="display:${uiPaused ? 'block' : 'none'}">
+                <polygon points="6 3 20 12 6 21 6 3"></polygon>
               </svg>
               <svg class="pause-icon" viewBox="0 0 24 24" fill="currentColor" style="display:${uiPaused ? 'none' : 'block'}">
                 <rect x="6" y="4" width="4" height="16" rx="1"></rect>
                 <rect x="14" y="4" width="4" height="16" rx="1"></rect>
               </svg>
             </button>
-            <div class="slowmo-ext-speed">
-              <span class="slowmo-ext-speed-value">${uiPaused ? 'Paused' : formatSpeed(uiSpeed)}</span>
-              <div class="slowmo-ext-speed-arrows">
-                <button class="slowmo-ext-arrow" data-action="up" title="Faster">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="18 15 12 9 6 15"></polyline>
-                  </svg>
-                </button>
-                <button class="slowmo-ext-arrow" data-action="down" title="Slower">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="6 9 12 15 18 9"></polyline>
-                  </svg>
-                </button>
-              </div>
+            <div class="slowmo-ext-presets slowmo-ext-fast">
+              <button class="slowmo-ext-preset ${uiSpeed === 1 && !uiPaused ? 'active' : ''}" data-speed="1">1x</button>
+              <button class="slowmo-ext-preset ${uiSpeed === 2 && !uiPaused ? 'active' : ''}" data-speed="2">2x</button>
+              <button class="slowmo-ext-preset skip" data-action="skip" title="Skip all animations">∞</button>
             </div>
-          </div>
-          <div class="slowmo-ext-presets">
-            ${speedPresets.map(s => `<button class="slowmo-ext-preset ${s === uiSpeed && !uiPaused ? 'active' : ''}" data-speed="${s}">${formatSpeed(s)}</button>`).join('')}
           </div>
         </div>
       </div>
@@ -551,14 +546,12 @@
     const collapsed = root.querySelector('.slowmo-ext-collapsed');
     const header = root.querySelector('.slowmo-ext-header');
     const closeBtn = root.querySelector('.slowmo-ext-close');
-    const pauseBtn = root.querySelector('[data-action="pause"]');
-    const upBtn = root.querySelector('[data-action="up"]');
-    const downBtn = root.querySelector('[data-action="down"]');
-    const presetBtns = root.querySelectorAll('.slowmo-ext-preset');
-    const speedBadge = root.querySelector('.speed-badge');
-    const speedValue = root.querySelector('.slowmo-ext-speed-value');
+    const playpauseBtn = root.querySelector('[data-action="playpause"]');
+    const skipBtn = root.querySelector('[data-action="skip"]');
+    const presetBtns = root.querySelectorAll('.slowmo-ext-preset[data-speed]');
+    const speedBadge = root.querySelector('.slowmo-ext-badge');
 
-    // Expand/collapse
+    // Expand on click
     collapsed.addEventListener('click', (e) => {
       if (isDragging) return;
       isExpanded = true;
@@ -566,42 +559,34 @@
       saveState();
     });
 
+    // Collapse
     closeBtn.addEventListener('click', () => {
       isExpanded = false;
       container.classList.remove('expanded');
       saveState();
     });
 
-    // Pause/play
-    pauseBtn.addEventListener('click', () => {
+    // Play/Pause
+    playpauseBtn.addEventListener('click', () => {
       uiPaused = !uiPaused;
       setSpeed(uiPaused ? 0 : uiSpeed);
       updateUI();
       saveState();
     });
 
-    // Speed up/down
-    upBtn.addEventListener('click', () => {
-      const idx = speedPresets.findIndex(s => s >= uiSpeed);
-      const nextIdx = Math.min(idx + 1, speedPresets.length - 1);
-      uiSpeed = speedPresets[nextIdx];
-      uiPaused = false;
-      setSpeed(uiSpeed);
-      updateUI();
-      saveState();
+    // Skip
+    skipBtn.addEventListener('click', () => {
+      skipAnimations();
+      // Flash the button to indicate action
+      skipBtn.style.background = 'var(--accent)';
+      skipBtn.style.color = '#000';
+      setTimeout(() => {
+        skipBtn.style.background = '';
+        skipBtn.style.color = '';
+      }, 200);
     });
 
-    downBtn.addEventListener('click', () => {
-      const idx = speedPresets.findIndex(s => s >= uiSpeed);
-      const prevIdx = Math.max(idx - 1, 0);
-      uiSpeed = speedPresets[prevIdx];
-      uiPaused = false;
-      setSpeed(uiSpeed);
-      updateUI();
-      saveState();
-    });
-
-    // Presets
+    // Speed presets
     presetBtns.forEach(btn => {
       btn.addEventListener('click', () => {
         uiSpeed = parseFloat(btn.dataset.speed);
@@ -622,31 +607,22 @@
 
       const onMove = (e) => {
         isDragging = true;
-        collapsed.classList.add('dragging');
         const x = e.clientX - dragOffset.x;
         const y = e.clientY - dragOffset.y;
-
-        // Calculate right/bottom from viewport
         const right = window.innerWidth - x - root.offsetWidth;
         const bottom = window.innerHeight - y - root.offsetHeight;
-
         root.style.right = Math.max(0, Math.min(right, window.innerWidth - 60)) + 'px';
         root.style.bottom = Math.max(0, Math.min(bottom, window.innerHeight - 60)) + 'px';
-        root.style.left = 'auto';
-        root.style.top = 'auto';
       };
 
       const onUp = () => {
-        collapsed.classList.remove('dragging');
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
-
         if (isDragging) {
           savePosition({
             right: parseInt(root.style.right),
             bottom: parseInt(root.style.bottom)
           });
-          // Reset dragging after a short delay to prevent click
           setTimeout(() => { isDragging = false; }, 50);
         }
       };
@@ -659,20 +635,20 @@
     header.addEventListener('mousedown', startDrag);
 
     function updateUI() {
-      // Update pause button
-      const playIcon = pauseBtn.querySelector('.play-icon');
-      const pauseIcon = pauseBtn.querySelector('.pause-icon');
+      // Play/Pause button
+      const playIcon = playpauseBtn.querySelector('.play-icon');
+      const pauseIcon = playpauseBtn.querySelector('.pause-icon');
       playIcon.style.display = uiPaused ? 'block' : 'none';
       pauseIcon.style.display = uiPaused ? 'none' : 'block';
-      pauseBtn.classList.toggle('active', uiPaused);
+      playpauseBtn.title = uiPaused ? 'Play' : 'Pause';
 
-      // Update speed display
-      speedValue.textContent = uiPaused ? 'Paused' : formatSpeed(uiSpeed);
-      speedBadge.textContent = formatSpeed(uiSpeed);
+      // Speed badge
+      speedBadge.textContent = uiPaused ? '||' : formatSpeed(uiSpeed);
 
-      // Update presets
+      // Preset buttons
       presetBtns.forEach(btn => {
-        btn.classList.toggle('active', parseFloat(btn.dataset.speed) === uiSpeed && !uiPaused);
+        const speed = parseFloat(btn.dataset.speed);
+        btn.classList.toggle('active', speed === uiSpeed && !uiPaused);
       });
     }
 
@@ -680,19 +656,112 @@
   }
 
   function formatSpeed(speed) {
-    if (speed < 1) return speed.toFixed(2) + 'x';
-    return speed.toFixed(1) + 'x';
+    if (speed < 1) return speed.toFixed(2).replace('0.', '.') + 'x';
+    return speed.toFixed(0) + 'x';
   }
 
-  // Wait for DOM ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      loadState();
-      createUI();
+  // ============================================
+  // CROSS-FRAME COMMUNICATION
+  // ============================================
+
+  const isTopFrame = window === window.top;
+  const MESSAGE_TYPE = 'slowmo-extension-sync';
+
+  // Broadcast speed change to all iframes
+  function broadcastToFrames(speed, paused) {
+    const message = { type: MESSAGE_TYPE, speed, paused };
+
+    // Send to all child iframes
+    const iframes = document.querySelectorAll('iframe');
+    iframes.forEach(iframe => {
+      try {
+        iframe.contentWindow?.postMessage(message, '*');
+      } catch (e) {
+        // Cross-origin iframe, message will still be received if our script is injected
+      }
     });
-  } else {
+  }
+
+  // Listen for messages from parent (if we're in an iframe)
+  window.addEventListener('message', (event) => {
+    if (event.data?.type === MESSAGE_TYPE) {
+      const { speed, paused } = event.data;
+      setSpeed(paused ? 0 : speed);
+
+      // Also forward to nested iframes
+      broadcastToFrames(speed, paused);
+    }
+  });
+
+  // Watch for new iframes being added to the DOM (top frame only)
+  function watchForNewIframes() {
+    if (!isTopFrame) return;
+
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeName === 'IFRAME') {
+            // New iframe added, send current state after it loads
+            node.addEventListener('load', () => {
+              try {
+                node.contentWindow?.postMessage({
+                  type: MESSAGE_TYPE,
+                  speed: uiSpeed,
+                  paused: uiPaused
+                }, '*');
+              } catch (e) {}
+            });
+          }
+          // Also check children of added nodes
+          if (node.querySelectorAll) {
+            node.querySelectorAll('iframe').forEach(iframe => {
+              iframe.addEventListener('load', () => {
+                try {
+                  iframe.contentWindow?.postMessage({
+                    type: MESSAGE_TYPE,
+                    speed: uiSpeed,
+                    paused: uiPaused
+                  }, '*');
+                } catch (e) {}
+              });
+            });
+          }
+        });
+      });
+    });
+
+    observer.observe(document.body || document.documentElement, {
+      childList: true,
+      subtree: true
+    });
+  }
+
+  // Wrap setSpeed to also broadcast changes (top frame only)
+  const originalSetSpeed = setSpeed;
+  if (isTopFrame) {
+    setSpeed = function(speed) {
+      originalSetSpeed(speed);
+      broadcastToFrames(speed, speed === 0);
+    };
+  }
+
+  // ============================================
+  // INITIALIZE
+  // ============================================
+
+  if (isTopFrame) {
+    // Top frame: load state, create UI, watch for iframes
     loadState();
     createUI();
+    watchForNewIframes();
+
+    // Sync existing iframes on load
+    setTimeout(() => {
+      broadcastToFrames(uiSpeed, uiPaused);
+    }, 100);
+  } else {
+    // Iframe: just install slowmo, no UI
+    // Speed will be synced via postMessage from parent
   }
 
 })();

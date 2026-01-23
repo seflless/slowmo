@@ -94,6 +94,10 @@ Add `data-slowmo-exclude` to opt out specific elements:
 - **WebGL shaders** with custom time uniforms need manual integration
 - **Server-synced animations** that rely on server timestamps rather than local time
 
+## Contributing
+
+Open to contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup and Chrome extension testing instructions.
+
 ## License
 
 MIT

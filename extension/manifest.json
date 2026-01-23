@@ -21,13 +21,8 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"],
-      "run_at": "document_start"
-    }
-  ],
-  "web_accessible_resources": [
-    {
-      "resources": ["slowmo.js"],
-      "matches": ["<all_urls>"]
+      "run_at": "document_end",
+      "all_frames": true
     }
   ]
 }
