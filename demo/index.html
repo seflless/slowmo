@@ -19,6 +19,11 @@
       padding: 2rem;
     }
 
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
     h1 {
       font-size: 2.5rem;
       font-weight: 300;
@@ -27,6 +32,10 @@
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
+    }
+
+    .container {
+      text-align: center;
     }
 
     .subtitle {
@@ -191,8 +200,9 @@
   </style>
 </head>
 <body>
+  <div class="container">
   <h1>slowmo</h1>
-  <p class="subtitle">Universal slow-motion control for web animations</p>
+  <p class="subtitle">Slow down or speed up time, to debug or study web animations.</p>
 
   <div class="controls">
     <div class="speed-display" id="speed-display">1.0x</div>
@@ -274,6 +284,7 @@
         <div style="font-size:11px;color:#666;">Slower = lower pitch, faster = higher pitch</div>
       </div>
     </div>
+  </div>
   </div>
 
   <script type="module">
