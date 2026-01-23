@@ -1,18 +1,16 @@
 # slowmo
 
-Slow down or speed up time on any web page.
+Control time on any web page. Debug, study, or speedrun animations.
 
 <!-- TODO: Add hero GIF/video here -->
 <!-- ![slowmo demo](./assets/demo.gif) -->
 
 ## Why?
 
-This is a utility package for making easy to use tools to:
-
 - **Debug animations** - Slow things down to see exactly what's happening
-- **Learn from others** - Appreciate the little details on why something looks so neat
-- **Speed run** - Skip or skim quickly through any animation gated experience
-- **Make games easier or harder** - Slower gives you better reflex, and faster challenges you more.
+- **Study details** - Appreciate the little details on why something looks so neat
+- **Speedrun UIs** - Skip or skim quickly through any animation gated experience
+- **Game difficulty** - Slower gives you better reflexes, faster challenges you more
 
 ## Install
 
@@ -98,6 +96,10 @@ Add `data-slowmo-exclude` to opt out specific elements:
 
 Open to contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup and Chrome extension testing instructions.
 
+## Inspiration
+
+Inspired by [agentation](https://agentation.dev/) by [Benji Taylor](https://x.com/BenjiTaylor) and his related blog posts [[1]](https://benji.org/annotating) [[2]](https://benji.org/agentation)
+
 ## License
 
 MIT
@@ -106,4 +108,4 @@ MIT
 
 <!-- TODO: Update with actual website URL -->
 
-[Website](https://slowmo.dev) · [GitHub](https://github.com/seflless/slowmo) · [npm](https://www.npmjs.com/package/slowmo)
+[website](https://slowmo.dev) · [github](https://github.com/seflless/slowmo) · [npm](https://www.npmjs.com/package/slowmo)
