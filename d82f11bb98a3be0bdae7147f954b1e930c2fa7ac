@@ -1,0 +1,23 @@
+demo/index.html
+  bab4c342c965a044 22-26,199,284
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.37",
+  "base_commit_sha": "d82f11bb98a3be0bdae7147f954b1e930c2fa7ac",
+  "prompts": {
+    "bab4c342c965a044": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "58144915-055c-4e3d-9efd-5546a4a54588",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Francois Laberge <francoislaberge@gmail.com>",
+      "messages": [],
+      "total_additions": 7,
+      "total_deletions": 0,
+      "accepted_lines": 7,
+      "overriden_lines": 0
+    }
+  }
+}
