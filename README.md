@@ -1,13 +1,9 @@
 # slowmo
 
-Slow down any web animation with one line of code.
+Slow down or speed up time, to debug or study web animations.
 
 <!-- TODO: Add hero GIF/video here -->
 <!-- ![slowmo demo](./assets/demo.gif) -->
-
-[![npm version](https://img.shields.io/npm/v/slowmo.svg)](https://www.npmjs.com/package/slowmo)
-[![bundle size](https://img.shields.io/bundlephobia/minzip/slowmo)](https://bundlephobia.com/package/slowmo)
-[![license](https://img.shields.io/npm/l/slowmo.svg)](https://github.com/anthropics/slowmo/blob/main/LICENSE)
 
 ## Why?
 
@@ -21,51 +17,18 @@ Slow down any web animation with one line of code.
 npm install slowmo
 ```
 
-```bash
-pnpm add slowmo
-```
-
-```bash
-yarn add slowmo
-```
-
-Or use a CDN:
-
-```html
-<script type="module">
-  import { slowmo } from 'https://esm.sh/slowmo';
-  slowmo(0.5);
-</script>
-```
-
 ## Quick Start
 
 ```js
-import { slowmo } from 'slowmo';
+import { slowmo } from "slowmo";
 
-slowmo(0.5);  // Everything runs at half speed
+slowmo(0.5); // That's it, now anything that moves will go half speed.
 ```
 
-That's it. CSS animations, videos, canvas, GSAP, Three.js, Framer Motion - all slowed down automatically.
-
-## What It Works With
-
-| Type | How |
-|------|-----|
-| CSS Animations | Web Animations API `playbackRate` |
-| CSS Transitions | Web Animations API `playbackRate` |
-| Videos & Audio | `playbackRate` property |
-| requestAnimationFrame | Patched timestamps |
-| performance.now() | Returns virtual time |
-| GSAP | `globalTimeline.timeScale()` (auto-detected) |
-| Three.js | Uses rAF, works automatically |
-| Framer Motion | Uses Web Animations API, works automatically |
-| Canvas animations | Uses rAF, works automatically |
-
-## API
+## Full API
 
 ```js
-import { slowmo } from 'slowmo';
+import { slowmo } from "slowmo";
 
 // Set speed (0.5 = half speed, 2 = double speed)
 slowmo(0.5);
@@ -81,28 +44,40 @@ slowmo.setSpeed(0.5);
 slowmo.pause();
 slowmo.play();
 slowmo.reset();
-slowmo.getSpeed();  // Returns current speed
+slowmo.getSpeed(); // Returns current speed
 ```
 
 ### Speed Guide
 
-| Speed | Effect |
-|-------|--------|
-| `0` | Paused |
+| Speed | Effect                           |
+| ----- | -------------------------------- |
+| `0`   | Paused                           |
 | `0.1` | 10x slower (great for debugging) |
-| `0.5` | Half speed |
-| `1` | Normal |
-| `2` | Double speed |
+| `0.5` | Half speed                       |
+| `1`   | Normal                           |
+| `2`   | Double speed                     |
 
 ### Excluding Elements
 
 Add `data-slowmo-exclude` to opt out specific elements:
 
 ```html
-<div data-slowmo-exclude>
-  This animation runs at normal speed
-</div>
+<div data-slowmo-exclude>This animation runs at normal speed</div>
 ```
+
+## What It Works With
+
+| Type                  | How                                          |
+| --------------------- | -------------------------------------------- |
+| CSS Animations        | Web Animations API `playbackRate`            |
+| CSS Transitions       | Web Animations API `playbackRate`            |
+| Videos & Audio        | `playbackRate` property                      |
+| requestAnimationFrame | Patched timestamps                           |
+| performance.now()     | Returns virtual time                         |
+| GSAP                  | `globalTimeline.timeScale()` (auto-detected) |
+| Three.js              | Uses rAF, works automatically                |
+| Framer Motion         | Uses Web Animations API, works automatically |
+| Canvas animations     | Uses rAF, works automatically                |
 
 ## Limitations
 
@@ -117,4 +92,5 @@ MIT
 ---
 
 <!-- TODO: Update with actual website URL -->
-[Website](https://slowmo.dev) · [GitHub](https://github.com/anthropics/slowmo) · [npm](https://www.npmjs.com/package/slowmo)
+
+[Website](https://slowmo.dev) · [GitHub](https://github.com/seflless/slowmo) · [npm](https://www.npmjs.com/package/slowmo)
