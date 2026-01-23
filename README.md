@@ -1,16 +1,6 @@
 # slowmo
 
-Control time on any web page. Debug, study, or speedrun animations.
-
-<!-- TODO: Add hero GIF/video here -->
-<!-- ![slowmo demo](./assets/demo.gif) -->
-
-## Why?
-
-- **Debug animations** - Slow things down to see exactly what's happening
-- **Study details** - Appreciate the little details on why something looks so neat
-- **Speedrun UIs** - Skip or skim quickly through any animation gated experience
-- **Game difficulty** - Slower gives you better reflexes, faster challenges you more
+Slow down or speed up time on any web page.
 
 ## Install
 
@@ -18,36 +8,30 @@ Control time on any web page. Debug, study, or speedrun animations.
 npm install slowmo
 ```
 
-> **Chrome Extension coming soon** - Control any website's animations without writing code.
+> **Chrome extension coming soon** - control any website's animations without writing code.
 
 ## Quick Start
 
 ```js
-import { slowmo } from "slowmo";
+import slowmo from "slowmo"
 
-slowmo(0.5); // That's it, now anything that moves will go half speed.
+slowmo(0.5) // half speed, that's it
 ```
 
 ## Full API
 
 ```js
-import { slowmo } from "slowmo";
+import slowmo from "slowmo"
 
-// Set speed (0.5 = half speed, 2 = double speed)
-slowmo(0.5);
+slowmo(0.5)           // half speed
+slowmo(2)             // double speed
+slowmo(0)             // pause
+slowmo(1)             // normal
 
-// Pause everything
-slowmo(0);
-
-// Back to normal
-slowmo(1);
-
-// Object API for more control
-slowmo.setSpeed(0.5);
-slowmo.pause();
-slowmo.play();
-slowmo.reset();
-slowmo.getSpeed(); // Returns current speed
+slowmo.pause()        // pause all
+slowmo.play()         // resume
+slowmo.reset()        // back to 1×
+slowmo.getSpeed()     // current speed
 ```
 
 ### Speed Guide

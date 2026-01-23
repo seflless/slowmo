@@ -1,944 +1,1082 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>slowmo - Control time on any web page</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #0c0a09;
-      --bg-elevated: #1c1917;
-      --bg-hover: #292524;
-      --border: #292524;
-      --border-subtle: #1c1917;
-      --text: #fafaf9;
-      --text-muted: #a8a29e;
-      --text-dim: #57534e;
-      --accent: #f59e0b;
-      --accent-muted: #d97706;
-      --accent-glow: rgba(245, 158, 11, 0.15);
-      --radius: 10px;
-      --radius-sm: 6px;
-      --font-sans: 'Instrument Sans', -apple-system, sans-serif;
-      --font-mono: 'DM Mono', 'SF Mono', monospace;
-    }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>slowmo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0c0a09;
+        --bg-elevated: #1c1917;
+        --bg-hover: #292524;
+        --border: #292524;
+        --border-subtle: #1c1917;
+        --text: #fafaf9;
+        --text-muted: #a8a29e;
+        --text-dim: #57534e;
+        --accent: #f59e0b;
+        --accent-muted: #d97706;
+        --accent-glow: rgba(245, 158, 11, 0.15);
+        --radius: 10px;
+        --radius-sm: 6px;
+        --font-sans: "Instrument Sans", -apple-system, sans-serif;
+        --font-mono: "DM Mono", "SF Mono", monospace;
+      }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
 
-    html {
-      scroll-behavior: smooth;
-    }
+      html {
+        scroll-behavior: smooth;
+      }
 
-    body {
-      font-family: var(--font-sans);
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      line-height: 1.5;
-      -webkit-font-smoothing: antialiased;
-    }
+      body {
+        font-family: var(--font-sans);
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
 
-    /* Grain overlay */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-      opacity: 0.03;
-      pointer-events: none;
-      z-index: 1000;
-    }
+      /* Grain overlay */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+        opacity: 0.03;
+        pointer-events: none;
+        z-index: 1000;
+      }
 
-    /* Layout */
-    .page {
-      max-width: 1000px;
-      margin: 0 auto;
-      padding: 2rem 1.5rem 4rem;
-    }
+      /* Layout */
+      .page {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 2rem 1.5rem 4rem;
+      }
 
-    /* Header */
-    .header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 1rem 0;
-      margin-bottom: 3rem;
-      border-bottom: 1px solid var(--border-subtle);
-    }
+      /* Header */
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem 0;
+        margin-bottom: 3rem;
+        border-bottom: 1px solid var(--border-subtle);
+      }
 
-    .logo {
-      font-size: 1.125rem;
-      font-weight: 600;
-      letter-spacing: -0.02em;
-      color: var(--text);
-      text-decoration: none;
-    }
+      .logo {
+        font-size: 1.125rem;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        color: var(--text);
+        text-decoration: none;
+      }
 
-    .nav {
-      display: flex;
-      gap: 1.5rem;
-    }
+      .nav {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+      }
 
-    .nav a {
-      font-size: 0.875rem;
-      color: var(--text-muted);
-      text-decoration: none;
-      transition: color 0.15s;
-    }
+      .nav a {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+        text-decoration: none;
+        transition: color 0.15s;
+      }
 
-    .nav a:hover {
-      color: var(--text);
-    }
+      .nav a:hover {
+        color: var(--text);
+      }
 
-    /* Hero */
-    .hero {
-      text-align: center;
-      margin-bottom: 4rem;
-    }
+      /* Hero */
+      .hero {
+        text-align: center;
+        margin-bottom: 4rem;
+        padding-top: 3rem;
+      }
 
-    .hero h1 {
-      font-size: clamp(2.5rem, 8vw, 4rem);
-      font-weight: 700;
-      letter-spacing: -0.04em;
-      margin-bottom: 0.75rem;
-      background: linear-gradient(135deg, var(--text) 0%, var(--text-muted) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
+      .hero-title {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        margin-bottom: 0.75rem;
+      }
 
-    .hero .tagline {
-      font-size: 1.125rem;
-      color: var(--text-muted);
-      margin-bottom: 2rem;
-      max-width: 400px;
-      margin-left: auto;
-      margin-right: auto;
-    }
+      .hero-links {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-top: 0.75em; /* align with x-height of "owmo", not the "l" ascender */
+      }
 
-    /* Install box */
-    .install-box {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.75rem;
-      background: var(--bg-elevated);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 0.625rem 0.75rem 0.625rem 1rem;
-      margin-bottom: 1rem;
-    }
+      .hero-links a {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-muted);
+        transition: color 0.15s;
+      }
 
-    .install-box code {
-      font-family: var(--font-mono);
-      font-size: 0.875rem;
-      color: var(--text);
-    }
+      .hero-links a:hover {
+        color: var(--text);
+      }
 
-    .install-box .copy-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 32px;
-      height: 32px;
-      border: none;
-      background: var(--bg-hover);
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      transition: all 0.15s;
-      color: var(--text-muted);
-    }
+      .hero-links svg {
+        width: 18px;
+        height: 18px;
+      }
 
-    .install-box .copy-btn:hover {
-      background: var(--border);
-      color: var(--text);
-    }
+      .hero-links .npm-icon {
+        width: 40px;
+        height: 40px;
+      }
 
-    .install-box .copy-btn.copied {
-      color: var(--accent);
-    }
+      .hero h1 {
+        font-size: 4rem;
+        font-weight: 700;
+        letter-spacing: -0.04em;
+        margin: 0;
+        padding-right: 0.05em;
+        background: linear-gradient(
+          135deg,
+          var(--text) 0%,
+          var(--text-muted) 100%
+        );
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
 
-    .badges {
-      display: flex;
-      justify-content: center;
-      gap: 0.75rem;
-      font-size: 0.8125rem;
-      color: var(--text-dim);
-    }
+      .hero .tagline {
+        font-size: 1.125rem;
+        color: var(--text-muted);
+        margin-bottom: 2rem;
+        max-width: 400px;
+        margin-left: auto;
+        margin-right: auto;
+      }
 
-    .badge {
-      display: flex;
-      align-items: center;
-      gap: 0.375rem;
-    }
+      /* Install box */
+      .install-box {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        background: var(--bg-elevated);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 0.625rem 0.75rem 0.625rem 1rem;
+        margin-bottom: 2rem;
+      }
 
-    .badge svg {
-      opacity: 0.6;
-    }
+      .install-box code {
+        font-family: var(--font-mono);
+        font-size: 0.875rem;
+        color: var(--text);
+      }
 
-    /* Use cases */
-    .use-cases {
-      display: flex;
-      justify-content: center;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      margin-top: 2rem;
-    }
+      .install-box .copy-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: var(--bg-hover);
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        transition: all 0.15s;
+        color: var(--text-muted);
+      }
 
-    .use-case {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.5rem 0.875rem;
-      background: var(--bg-elevated);
-      border: 1px solid var(--border);
-      border-radius: 100px;
-      font-size: 0.8125rem;
-      color: var(--text-muted);
-    }
+      .install-box .copy-btn:hover {
+        background: var(--border);
+        color: var(--text);
+      }
 
-    .use-case svg {
-      width: 14px;
-      height: 14px;
-      opacity: 0.7;
-    }
+      .install-box .copy-btn.copied {
+        color: var(--accent);
+      }
 
-    /* Controller + Quick Start Section */
-    .controller-section {
-      position: relative;
-      padding: 2rem 0;
-      margin-bottom: 2rem;
-    }
+      /* Use cases */
+      .use-cases {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
 
-    .controller-section h2 {
-      text-align: center;
-      font-size: 0.75rem;
-      font-weight: 500;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--text-dim);
-      margin-bottom: 1rem;
-    }
+      .use-case {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0.875rem;
+        background: var(--bg-elevated);
+        border: 1px solid var(--border);
+        border-radius: 100px;
+        font-size: 0.8125rem;
+        color: var(--text-muted);
+      }
 
-    .controller-wrapper {
-      display: flex;
-      justify-content: center;
-      margin-bottom: 1.5rem;
-    }
+      .use-case svg {
+        width: 14px;
+        height: 14px;
+        opacity: 0.7;
+      }
 
-    /* The actual controller - reusable component */
-    .slowmo-controller {
-      display: flex;
-      align-items: center;
-      gap: 0.375rem;
-      background: var(--bg-elevated);
-      border: 1px solid var(--border);
-      border-radius: 100px;
-      padding: 0.375rem 0.5rem;
-      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.03);
-      user-select: none;
-    }
+      /* Controller + Quick Start Section */
+      .controller-section {
+        position: relative;
+        padding: 2rem 0;
+        margin-bottom: 2rem;
+      }
 
-    .controller-presets {
-      display: flex;
-      gap: 2px;
-    }
+      .controller-section h2 {
+        text-align: center;
+        font-size: 0.875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+        margin-bottom: 1rem;
+      }
 
-    .preset-btn {
-      padding: 0.375rem 0.625rem;
-      border: none;
-      background: transparent;
-      border-radius: 100px;
-      cursor: pointer;
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      color: var(--text-dim);
-      transition: all 0.15s;
-    }
+      .controller-wrapper {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 1.5rem;
+      }
 
-    .preset-btn:hover {
-      background: var(--bg-hover);
-      color: var(--text-muted);
-    }
+      /* The actual controller - reusable component */
+      .slowmo-controller {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        background: var(--bg-elevated);
+        border: 1px solid var(--border);
+        border-radius: 100px;
+        padding: 0.375rem 0.5rem;
+        box-shadow:
+          0 4px 24px rgba(0, 0, 0, 0.4),
+          0 0 0 1px rgba(255, 255, 255, 0.03);
+        user-select: none;
+      }
 
-    .preset-btn.active {
-      background: var(--accent-glow);
-      color: var(--accent);
-    }
+      .controller-presets {
+        display: flex;
+        gap: 2px;
+      }
 
-    .preset-btn.skip {
-      font-family: var(--font-sans);
-      font-size: 0.875rem;
-    }
+      .preset-btn {
+        padding: 0.5rem 0.75rem;
+        border: none;
+        background: transparent;
+        border-radius: 100px;
+        cursor: pointer;
+        font-family: var(--font-mono);
+        font-size: 1rem;
+        color: var(--text-dim);
+        transition: all 0.15s;
+      }
 
-    .controller-playpause {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 36px;
-      height: 36px;
-      border: none;
-      background: var(--accent);
-      border-radius: 50%;
-      cursor: pointer;
-      color: var(--bg);
-      transition: all 0.15s;
-      margin: 0 0.25rem;
-    }
+      .preset-btn:hover {
+        background: var(--bg-hover);
+        color: var(--text-muted);
+      }
 
-    .controller-playpause:hover {
-      transform: scale(1.05);
-      box-shadow: 0 0 12px var(--accent-glow);
-    }
+      .preset-btn.active {
+        background: var(--accent-glow);
+        color: var(--accent);
+      }
 
-    .controller-playpause svg {
-      width: 16px;
-      height: 16px;
-    }
+      .preset-btn.skip {
+        font-family: var(--font-sans);
+        font-size: 0.875rem;
+      }
 
-    /* Quick Start inline */
-    .quick-start-inline {
-      max-width: 400px;
-      margin: 0 auto;
-      background: var(--bg-elevated);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 1rem 1.25rem;
-    }
+      .controller-playpause {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border: none;
+        background: var(--accent);
+        border-radius: 50%;
+        cursor: pointer;
+        color: var(--bg);
+        transition: all 0.15s;
+        margin: 0 0.25rem;
+      }
 
-    .quick-start-inline h3 {
-      font-size: 0.75rem;
-      font-weight: 500;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--text-dim);
-      margin-bottom: 0.75rem;
-    }
+      .controller-playpause:hover {
+        transform: scale(1.05);
+        box-shadow: 0 0 12px var(--accent-glow);
+      }
 
-    .quick-start-inline pre {
-      margin: 0;
-    }
+      .controller-playpause svg {
+        width: 16px;
+        height: 16px;
+      }
 
-    .quick-start-inline code {
-      font-family: var(--font-mono);
-      font-size: 0.8125rem;
-      line-height: 1.7;
-      color: var(--text-muted);
-    }
+      /* Quick Start inline */
+      .quick-start-inline {
+        max-width: 400px;
+        margin: 0 auto;
+        background: var(--bg-elevated);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1rem 1.25rem;
+      }
 
-    .quick-start-inline .keyword { color: #c084fc; }
-    .quick-start-inline .string { color: #4ade80; }
-    .quick-start-inline .function { color: #60a5fa; }
-    .quick-start-inline .number { color: var(--accent); }
-    .quick-start-inline .comment { color: var(--text-dim); }
+      .quick-start-inline h3 {
+        font-size: 0.75rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-dim);
+        margin-bottom: 0.75rem;
+      }
 
-    /* Demo Grid */
-    .demos-section {
-      margin-bottom: 4rem;
-    }
+      .quick-start-inline pre {
+        margin: 0;
+      }
 
-    .section-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 1.5rem;
-    }
+      .quick-start-inline code {
+        font-family: var(--font-mono);
+        font-size: 0.8125rem;
+        line-height: 1.7;
+        color: var(--text-muted);
+      }
 
-    .section-header h2 {
-      font-size: 0.75rem;
-      font-weight: 500;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--text-dim);
-    }
+      .quick-start-inline .keyword {
+        color: #c084fc;
+      }
+      .quick-start-inline .string {
+        color: #4ade80;
+      }
+      .quick-start-inline .function {
+        color: #60a5fa;
+      }
+      .quick-start-inline .number {
+        color: var(--accent);
+      }
+      .quick-start-inline .comment {
+        color: var(--text-dim);
+      }
 
-    .demos-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 1rem;
-    }
+      /* Demo Grid */
+      .demos-section {
+        margin-bottom: 4rem;
+      }
 
-    @media (max-width: 768px) {
+      .section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1.5rem;
+      }
+
+      .section-header h2 {
+        font-size: 0.75rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-dim);
+      }
+
       .demos-grid {
-        grid-template-columns: repeat(2, 1fr);
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
       }
-    }
 
-    @media (max-width: 480px) {
-      .demos-grid {
-        grid-template-columns: 1fr;
+      @media (max-width: 768px) {
+        .demos-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
       }
-    }
 
-    .demo-card {
-      background: var(--bg-elevated);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-      transition: border-color 0.15s;
-    }
-
-    .demo-card:hover {
-      border-color: var(--border);
-    }
-
-    .demo-visual {
-      aspect-ratio: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-      overflow: hidden;
-      background: var(--bg);
-    }
-
-    .demo-label {
-      padding: 0.625rem 0.75rem;
-      border-top: 1px solid var(--border-subtle);
-    }
-
-    .demo-label h3 {
-      font-size: 0.8125rem;
-      font-weight: 500;
-      color: var(--text);
-      margin-bottom: 0.125rem;
-    }
-
-    .demo-label p {
-      font-size: 0.6875rem;
-      color: var(--text-dim);
-    }
-
-    /* Animation elements */
-    .anim-box {
-      width: 40px;
-      height: 40px;
-      border-radius: 8px;
-    }
-
-    .css-box {
-      background: linear-gradient(135deg, #f472b6 0%, #fb7185 100%);
-      animation: spin 2s linear infinite;
-    }
-
-    @keyframes spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
-    }
-
-    .raf-box {
-      background: linear-gradient(135deg, #38bdf8 0%, #22d3ee 100%);
-      position: absolute;
-    }
-
-    .waa-box {
-      background: linear-gradient(135deg, #4ade80 0%, #34d399 100%);
-    }
-
-    .demo-visual video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    /* API Section */
-    .api-section {
-      margin-bottom: 4rem;
-    }
-
-    .api-section h2 {
-      font-size: 0.75rem;
-      font-weight: 500;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--text-dim);
-      margin-bottom: 1.5rem;
-    }
-
-    .api-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 1rem;
-    }
-
-    @media (max-width: 640px) {
-      .api-grid {
-        grid-template-columns: 1fr;
+      @media (max-width: 480px) {
+        .demos-grid {
+          grid-template-columns: 1fr;
+        }
       }
-    }
 
-    .api-card {
-      background: var(--bg-elevated);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 1.25rem;
-    }
-
-    .api-card h3 {
-      font-size: 0.875rem;
-      font-weight: 500;
-      margin-bottom: 0.75rem;
-    }
-
-    .api-card pre {
-      background: var(--bg);
-      border-radius: var(--radius-sm);
-      padding: 0.875rem 1rem;
-      overflow-x: auto;
-    }
-
-    .api-card code {
-      font-family: var(--font-mono);
-      font-size: 0.8125rem;
-      line-height: 1.6;
-      color: var(--text-muted);
-    }
-
-    .api-card code .keyword {
-      color: #c084fc;
-    }
-
-    .api-card code .string {
-      color: #4ade80;
-    }
-
-    .api-card code .function {
-      color: #60a5fa;
-    }
-
-    .api-card code .number {
-      color: var(--accent);
-    }
-
-    .api-card code .comment {
-      color: var(--text-dim);
-    }
-
-    /* Credits */
-    .credits {
-      text-align: center;
-      padding: 2rem 0;
-      margin-bottom: 2rem;
-      border-top: 1px solid var(--border-subtle);
-    }
-
-    .credits p {
-      font-size: 0.8125rem;
-      color: var(--text-dim);
-    }
-
-    .credits a {
-      color: var(--text-muted);
-      text-decoration: none;
-      transition: color 0.15s;
-    }
-
-    .credits a:hover {
-      color: var(--accent);
-    }
-
-    /* Footer */
-    .footer {
-      border-top: 1px solid var(--border-subtle);
-      padding-top: 2rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-
-    .footer-left {
-      display: flex;
-      align-items: center;
-      gap: 1.5rem;
-    }
-
-    .footer-brand {
-      font-weight: 600;
-      font-size: 0.9375rem;
-    }
-
-    .footer-links {
-      display: flex;
-      gap: 1.25rem;
-    }
-
-    .footer-links a {
-      font-size: 0.8125rem;
-      color: var(--text-muted);
-      text-decoration: none;
-      transition: color 0.15s;
-    }
-
-    .footer-links a:hover {
-      color: var(--text);
-    }
-
-    .footer-right {
-      font-size: 0.8125rem;
-      color: var(--text-dim);
-    }
-
-    /* Chrome extension badge */
-    .extension-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.5rem 0.875rem;
-      background: linear-gradient(135deg, var(--accent-glow) 0%, transparent 100%);
-      border: 1px solid var(--accent-muted);
-      border-radius: 100px;
-      font-size: 0.75rem;
-      font-weight: 500;
-      color: var(--accent);
-      margin-left: 1rem;
-    }
-
-    .extension-badge::before {
-      content: '';
-      width: 6px;
-      height: 6px;
-      background: var(--accent);
-      border-radius: 50%;
-      animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-
-    /* Staggered animations for page load */
-    .fade-up {
-      opacity: 0;
-      transform: translateY(20px);
-      animation: fadeUp 0.6s ease forwards;
-    }
-
-    @keyframes fadeUp {
-      to {
-        opacity: 1;
-        transform: translateY(0);
+      .demo-card {
+        background: var(--bg-elevated);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+        transition: border-color 0.15s;
       }
-    }
 
-    .fade-up:nth-child(1) { animation-delay: 0s; }
-    .fade-up:nth-child(2) { animation-delay: 0.1s; }
-    .fade-up:nth-child(3) { animation-delay: 0.2s; }
-    .fade-up:nth-child(4) { animation-delay: 0.3s; }
-  </style>
-</head>
-<body>
-  <div class="page">
-    <!-- Header -->
-    <header class="header fade-up">
-      <a href="#" class="logo">slowmo</a>
-      <nav class="nav">
-        <a href="https://github.com/seflless/slowmo">github</a>
-        <a href="https://www.npmjs.com/package/slowmo">npm</a>
-        <span class="extension-badge">Chrome Extension Soon</span>
-      </nav>
-    </header>
+      .demo-card:hover {
+        border-color: var(--border);
+      }
 
-    <!-- Hero -->
-    <section class="hero fade-up">
-      <h1>slowmo</h1>
-      <p class="tagline">Control time on any web page. Debug, study, or speedrun animations.</p>
+      .demo-visual {
+        aspect-ratio: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+        background: var(--bg);
+      }
 
-      <div class="install-box">
-        <code>npm install slowmo</code>
-        <button class="copy-btn" onclick="copyInstall()" title="Copy to clipboard">
-          <svg id="copy-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
-          </svg>
-          <svg id="check-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
-            <polyline points="20 6 9 17 4 12"></polyline>
-          </svg>
-        </button>
-      </div>
+      .demo-label {
+        padding: 0.625rem 0.75rem;
+        border-top: 1px solid var(--border-subtle);
+      }
 
-      <div class="badges">
-        <span class="badge">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
-          </svg>
-          ~2KB gzipped
-        </span>
-        <span class="badge">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"></circle>
-            <polyline points="12 6 12 12 16 14"></polyline>
-          </svg>
-          Zero dependencies
-        </span>
-      </div>
+      .demo-label h3 {
+        font-size: 0.8125rem;
+        font-weight: 500;
+        color: var(--text);
+        margin-bottom: 0.125rem;
+      }
 
-      <div class="use-cases">
-        <span class="use-case">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 20V10M18 20V4M6 20v-4"></path>
-          </svg>
-          Debug animations
-        </span>
-        <span class="use-case">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"></circle>
-            <path d="M12 16v-4M12 8h.01"></path>
-          </svg>
-          Study details
-        </span>
-        <span class="use-case">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-          </svg>
-          Speedrun UIs
-        </span>
-        <span class="use-case">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="2" y="6" width="20" height="12" rx="2"></rect>
-            <path d="M12 12h.01M17 12h.01M7 12h.01"></path>
-          </svg>
-          Game difficulty
-        </span>
-      </div>
-    </section>
+      .demo-label p {
+        font-size: 0.6875rem;
+        color: var(--text-dim);
+      }
 
-    <!-- Quick Start -->
-    <section class="controller-section fade-up">
-      <h2>Quick Start</h2>
-      <div class="quick-start-inline">
-        <pre><code><span class="function">slowmo</span>(<span class="number">0.5</span>);  <span class="comment">// Half speed</span>
-<span class="comment">// slowmo(2);   // Double speed</span>
-<span class="comment">// slowmo(1);   // Normal speed</span></code></pre>
-      </div>
-    </section>
+      /* Animation elements */
+      .anim-box {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+      }
 
-    <!-- Try It Controller -->
-    <section class="controller-section fade-up">
-      <h2>Try It</h2>
-      <div class="controller-wrapper">
-        <div class="slowmo-controller" id="main-controller">
-          <div class="controller-presets slow-presets">
-            <button class="preset-btn" data-speed="0.1">.1x</button>
-            <button class="preset-btn" data-speed="0.25">.25x</button>
-            <button class="preset-btn" data-speed="0.5">.5x</button>
+      .css-box {
+        background: linear-gradient(135deg, #f472b6 0%, #fb7185 100%);
+        animation: spin 2s linear infinite;
+      }
+
+      @keyframes spin {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .raf-box {
+        background: linear-gradient(135deg, #38bdf8 0%, #22d3ee 100%);
+        position: absolute;
+      }
+
+      .waa-box {
+        background: linear-gradient(135deg, #4ade80 0%, #34d399 100%);
+      }
+
+      .demo-visual video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      /* API Section */
+      .api-section {
+        margin-bottom: 4rem;
+      }
+
+      .api-section h2 {
+        font-size: 0.875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+        margin-bottom: 1.5rem;
+        text-align: center;
+      }
+
+      .api-card {
+        background: var(--bg-elevated);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.25rem;
+        max-width: 400px;
+        margin: 0 auto;
+      }
+
+      .api-card pre {
+        background: var(--bg);
+        border-radius: var(--radius-sm);
+        padding: 0.875rem 1rem;
+        overflow-x: auto;
+        margin: 0;
+      }
+
+      .api-card code {
+        font-family: var(--font-mono);
+        font-size: 0.8125rem;
+        line-height: 1.7;
+        color: var(--text-muted);
+      }
+
+      .api-card code .keyword {
+        color: #c084fc;
+      }
+
+      .api-card code .string {
+        color: #4ade80;
+      }
+
+      .api-card code .function {
+        color: #60a5fa;
+      }
+
+      .api-card code .number {
+        color: var(--accent);
+      }
+
+      .api-card code .comment {
+        color: var(--text-dim);
+      }
+
+      /* Credits */
+      .credits {
+        text-align: center;
+        padding: 2rem 0;
+        margin-bottom: 2rem;
+        border-top: 1px solid var(--border-subtle);
+      }
+
+      .credits p {
+        font-size: 0.8125rem;
+        color: var(--text-dim);
+      }
+
+      .credits a {
+        color: var(--text-muted);
+        text-decoration: none;
+        transition: color 0.15s;
+      }
+
+      .credits a:hover {
+        color: var(--accent);
+      }
+
+      /* Footer */
+      .footer {
+        border-top: 1px solid var(--border-subtle);
+        padding-top: 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 1rem;
+      }
+
+      .footer-links {
+        display: flex;
+        gap: 1.25rem;
+      }
+
+      .footer-links a {
+        font-size: 0.8125rem;
+        color: var(--text-muted);
+        text-decoration: none;
+        transition: color 0.15s;
+      }
+
+      .footer-links a:hover {
+        color: var(--text);
+      }
+
+      .footer-center {
+        font-size: 0.8125rem;
+        color: var(--text-dim);
+      }
+
+      .footer-center a {
+        color: var(--text-muted);
+        text-decoration: none;
+        transition: color 0.15s;
+      }
+
+      .footer-center a:hover {
+        color: var(--text);
+      }
+
+      .footer-right {
+        font-size: 0.8125rem;
+        color: var(--text-dim);
+      }
+
+      .footer-right a {
+        color: var(--text-dim);
+        text-decoration: none;
+        transition: color 0.15s;
+      }
+
+      .footer-right a:hover {
+        color: var(--text-muted);
+      }
+
+      /* Extension note - subtle text */
+      .extension-note {
+        font-size: 0.8125rem;
+        color: var(--text-dim);
+        margin-top: 0.5rem;
+        margin-bottom: 2rem;
+      }
+
+      /* Section title in hero */
+      .section-title {
+        font-size: 0.875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+      }
+
+      /* Staggered animations for page load */
+      .fade-up {
+        opacity: 0;
+        transform: translateY(20px);
+        animation: fadeUp 0.6s ease forwards;
+      }
+
+      @keyframes fadeUp {
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .fade-up:nth-child(1) {
+        animation-delay: 0s;
+      }
+      .fade-up:nth-child(2) {
+        animation-delay: 0.1s;
+      }
+      .fade-up:nth-child(3) {
+        animation-delay: 0.2s;
+      }
+      .fade-up:nth-child(4) {
+        animation-delay: 0.3s;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <!-- Hero -->
+      <section class="hero fade-up">
+        <div class="hero-title">
+          <h1>slowmo</h1>
+          <div class="hero-links">
+            <a
+              href="https://github.com/seflless/slowmo"
+              title="GitHub"
+              target="_blank"
+              rel="noopener"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                width="24"
+                height="24"
+              >
+                <path
+                  d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
+                />
+              </svg>
+            </a>
+            <a
+              href="https://www.npmjs.com/package/slowmo"
+              title="npm"
+              target="_blank"
+              rel="noopener"
+            >
+              <svg class="npm-icon" viewBox="0 0 24 24" fill="currentColor">
+                <path
+                  d="M0 7.334v8h6.666v1.332H12v-1.332h12v-8H0zm6.666 6.664H5.334v-4H3.999v4H1.335V8.667h5.331v5.331zm4 0v1.336H8.001V8.667h5.334v5.332h-2.669v-.001zm12.001 0h-1.33v-4h-1.336v4h-1.335v-4h-1.33v4h-2.671V8.667h8.002v5.331zM10.665 10H12v2.667h-1.335V10z"
+                />
+              </svg>
+            </a>
           </div>
-          <button class="controller-playpause" id="pause-btn" title="Pause">
-            <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor" style="display:none">
-              <polygon points="6 3 20 12 6 21 6 3"></polygon>
+        </div>
+        <p class="tagline">Slow down or speed up time on any web page.</p>
+
+        <div class="install-box">
+          <code>npm install slowmo</code>
+          <button
+            class="copy-btn"
+            onclick="copyInstall()"
+            title="Copy to clipboard"
+          >
+            <svg
+              id="copy-icon"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path
+                d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"
+              ></path>
             </svg>
-            <svg class="pause-icon" viewBox="0 0 24 24" fill="currentColor">
-              <rect x="6" y="4" width="4" height="16" rx="1"></rect>
-              <rect x="14" y="4" width="4" height="16" rx="1"></rect>
+            <svg
+              id="check-icon"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              style="display: none"
+            >
+              <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
           </button>
-          <div class="controller-presets fast-presets">
-            <button class="preset-btn active" data-speed="1">1x</button>
-            <button class="preset-btn" data-speed="2">2x</button>
-            <button class="preset-btn skip" id="skip-btn" title="Skip animations">&#8734;</button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Demos -->
-    <section class="demos-section fade-up">
-      <div class="demos-grid">
-        <div class="demo-card">
-          <div class="demo-visual">
-            <div class="anim-box css-box"></div>
-          </div>
-          <div class="demo-label">
-            <h3>CSS Animation</h3>
-            <p>@keyframes</p>
-          </div>
         </div>
 
-        <div class="demo-card">
-          <div class="demo-visual" id="raf-container">
-            <div class="anim-box raf-box" id="raf-box"></div>
-          </div>
-          <div class="demo-label">
-            <h3>requestAnimationFrame</h3>
-            <p>JS animation loop</p>
+        <h3 class="section-title">Why?</h3>
+        <div class="use-cases">
+          <span class="use-case">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M12 20V10M18 20V4M6 20v-4"></path>
+            </svg>
+            Debug animations
+          </span>
+          <span class="use-case">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M12 16v-4M12 8h.01"></path>
+            </svg>
+            Study other people's animations
+          </span>
+          <span class="use-case">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            Speedrun UIs
+          </span>
+          <span class="use-case">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect x="2" y="6" width="20" height="12" rx="2"></rect>
+              <path d="M12 12h.01M17 12h.01M7 12h.01"></path>
+            </svg>
+            Make any game easier or harder
+          </span>
+        </div>
+      </section>
+
+      <!-- Quick Start -->
+      <section class="controller-section fade-up">
+        <h2>Quick Start</h2>
+        <div class="quick-start-inline">
+          <pre><code><span class="keyword">import</span> slowmo <span class="keyword">from</span> <span class="string">"slowmo"</span>
+
+<span class="function">slowmo</span>(<span class="number">0.5</span>)  <span class="comment">// half the speed of time</span></code></pre>
+        </div>
+      </section>
+
+      <!-- Try It Controller -->
+      <section class="controller-section fade-up">
+        <h2>Try It</h2>
+        <div class="controller-wrapper">
+          <div class="slowmo-controller" id="main-controller">
+            <div class="controller-presets slow-presets">
+              <button class="preset-btn" data-speed="0.1">⅒</button>
+              <button class="preset-btn" data-speed="0.25">¼</button>
+              <button class="preset-btn" data-speed="0.5">½</button>
+            </div>
+            <button class="controller-playpause" id="pause-btn" title="Pause">
+              <svg
+                class="play-icon"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                style="display: none"
+              >
+                <polygon points="6 3 20 12 6 21 6 3"></polygon>
+              </svg>
+              <svg class="pause-icon" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="4" width="4" height="16" rx="1"></rect>
+                <rect x="14" y="4" width="4" height="16" rx="1"></rect>
+              </svg>
+            </button>
+            <div class="controller-presets fast-presets">
+              <button class="preset-btn active" data-speed="1">1×</button>
+              <button class="preset-btn" data-speed="2">2×</button>
+              <button
+                class="preset-btn"
+                data-speed="Infinity"
+                id="infinity-btn"
+                title="Maximum speed"
+              >
+                ∞
+              </button>
+            </div>
           </div>
         </div>
+      </section>
 
-        <div class="demo-card">
-          <div class="demo-visual">
-            <div class="anim-box waa-box" id="waa-box"></div>
+      <!-- Demos -->
+      <section class="demos-section fade-up">
+        <div class="demos-grid">
+          <div class="demo-card">
+            <div class="demo-visual">
+              <div class="anim-box css-box"></div>
+            </div>
+            <div class="demo-label">
+              <h3>CSS Animation</h3>
+              <p>@keyframes</p>
+            </div>
           </div>
-          <div class="demo-label">
-            <h3>Web Animations API</h3>
-            <p>element.animate()</p>
+
+          <div class="demo-card">
+            <div class="demo-visual" id="raf-container">
+              <div class="anim-box raf-box" id="raf-box"></div>
+            </div>
+            <div class="demo-label">
+              <h3>requestAnimationFrame</h3>
+              <p>JS animation loop</p>
+            </div>
+          </div>
+
+          <div class="demo-card">
+            <div class="demo-visual">
+              <div class="anim-box waa-box" id="waa-box"></div>
+            </div>
+            <div class="demo-label">
+              <h3>Web Animations API</h3>
+              <p>element.animate()</p>
+            </div>
+          </div>
+
+          <div class="demo-card">
+            <div class="demo-visual">
+              <video id="demo-video" autoplay muted loop playsinline>
+                <source
+                  src="https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+                  type="video/mp4"
+                />
+              </video>
+            </div>
+            <div class="demo-label">
+              <h3>Video</h3>
+              <p>HTML5 video</p>
+            </div>
           </div>
         </div>
+      </section>
 
-        <div class="demo-card">
-          <div class="demo-visual">
-            <video id="demo-video" autoplay muted loop playsinline>
-              <source src="https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" type="video/mp4">
-            </video>
-          </div>
-          <div class="demo-label">
-            <h3>Video</h3>
-            <p>HTML5 video</p>
-          </div>
+      <!-- API -->
+      <section class="api-section fade-up">
+        <h2>Full API</h2>
+        <div class="api-card api-full">
+          <pre><code><span class="keyword">import</span> slowmo <span class="keyword">from</span> <span class="string">"slowmo"</span>
+
+slowmo(<span class="number">0.5</span>)           <span class="comment">// half speed</span>
+slowmo(<span class="number">2</span>)             <span class="comment">// double speed</span>
+slowmo(<span class="number">0</span>)             <span class="comment">// pause</span>
+slowmo(<span class="number">1</span>)             <span class="comment">// normal</span>
+
+slowmo.<span class="function">pause</span>()        <span class="comment">// pause all</span>
+slowmo.<span class="function">play</span>()         <span class="comment">// resume</span>
+slowmo.<span class="function">reset</span>()        <span class="comment">// back to 1×</span>
+slowmo.<span class="function">getSpeed</span>()     <span class="comment">// current speed</span></code></pre>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- API -->
-    <section class="api-section fade-up">
-      <h2>API Reference</h2>
-      <div class="api-grid">
-        <div class="api-card">
-          <h3>Install</h3>
-          <pre><code><span class="keyword">import</span> { slowmo } <span class="keyword">from</span> <span class="string">"slowmo"</span>;
+      <!-- Credits -->
+      <section class="credits fade-up">
+        <p>
+          Inspired by
+          <a href="https://agentation.dev/" target="_blank" rel="noopener"
+            >agentation</a
+          >
+          by
+          <a
+            href="https://x.com/intent/follow?screen_name=BenjiTaylor"
+            target="_blank"
+            rel="noopener"
+            >Benji Taylor</a
+          >
+          and his related
+          <a href="https://benji.org/annotating" target="_blank" rel="noopener"
+            >blog</a
+          >
+          <a href="https://benji.org/agentation" target="_blank" rel="noopener"
+            >posts</a
+          >
+        </p>
+      </section>
 
-slowmo(<span class="number">0.5</span>);  <span class="comment">// Any speed</span>
-slowmo(<span class="number">0</span>);    <span class="comment">// Pause</span></code></pre>
-        </div>
-
-        <div class="api-card">
-          <h3>Methods</h3>
-          <pre><code>slowmo.<span class="function">pause</span>();
-slowmo.<span class="function">play</span>();
-slowmo.<span class="function">reset</span>();       <span class="comment">// Back to 1x</span>
-slowmo.<span class="function">getSpeed</span>();    <span class="comment">// Current</span></code></pre>
-        </div>
-      </div>
-    </section>
-
-    <!-- Credits -->
-    <section class="credits fade-up">
-      <p>Inspired by <a href="https://agentation.dev/" target="_blank" rel="noopener">agentation</a> by <a href="https://x.com/intent/follow?screen_name=BenjiTaylor" target="_blank" rel="noopener">Benji Taylor</a> and his related blog posts <a href="https://benji.org/annotating" target="_blank" rel="noopener">[1]</a> <a href="https://benji.org/agentation" target="_blank" rel="noopener">[2]</a></p>
-    </section>
-
-    <!-- Footer -->
-    <footer class="footer fade-up">
-      <div class="footer-left">
-        <span class="footer-brand">slowmo</span>
+      <!-- Footer -->
+      <footer class="footer fade-up">
         <div class="footer-links">
           <a href="https://github.com/seflless/slowmo">github</a>
           <a href="https://www.npmjs.com/package/slowmo">npm</a>
           <a href="https://github.com/seflless/slowmo/issues">issues</a>
         </div>
-      </div>
-      <div class="footer-right">MIT License</div>
-    </footer>
-  </div>
+        <div class="footer-center">
+          Made with ❤️ by
+          <a href="https://x.com/seflless" target="_blank" rel="noopener"
+            >@seflless</a
+          >
+        </div>
+        <div class="footer-right">
+          <a
+            href="https://github.com/seflless/slowmo/blob/main/LICENSE"
+            target="_blank"
+            rel="noopener"
+            >MIT License</a
+          >
+        </div>
+      </footer>
+    </div>
 
-  <script type="module">
-    import { slowmo } from '../src/index.ts';
+    <script type="module">
+      import { slowmo } from "../src/index.ts";
 
-    // Copy install command
-    window.copyInstall = function() {
-      navigator.clipboard.writeText('npm install slowmo');
-      const copyIcon = document.getElementById('copy-icon');
-      const checkIcon = document.getElementById('check-icon');
-      const btn = document.querySelector('.copy-btn');
+      // Copy install command
+      window.copyInstall = function () {
+        navigator.clipboard.writeText("npm install slowmo");
+        const copyIcon = document.getElementById("copy-icon");
+        const checkIcon = document.getElementById("check-icon");
+        const btn = document.querySelector(".copy-btn");
 
-      copyIcon.style.display = 'none';
-      checkIcon.style.display = 'block';
-      btn.classList.add('copied');
+        copyIcon.style.display = "none";
+        checkIcon.style.display = "block";
+        btn.classList.add("copied");
 
-      setTimeout(() => {
-        copyIcon.style.display = 'block';
-        checkIcon.style.display = 'none';
-        btn.classList.remove('copied');
-      }, 2000);
-    };
+        setTimeout(() => {
+          copyIcon.style.display = "block";
+          checkIcon.style.display = "none";
+          btn.classList.remove("copied");
+        }, 2000);
+      };
 
-    // Current speed state
-    let currentSpeed = 1;
-    let isPaused = false;
+      // Current speed state
+      let currentSpeed = 1;
+      let isPaused = false;
 
-    // Speed presets for stepping
-    const speedPresets = [0.1, 0.25, 0.5, 1, 2, 4];
+      // Speed presets for stepping
+      const speedPresets = [0.1, 0.25, 0.5, 1, 2, 4];
 
-    function updateSpeed(speed, paused = false) {
-      isPaused = paused;
-      currentSpeed = speed;
-      slowmo(paused ? 0 : speed);
+      function updateSpeed(speed, paused = false) {
+        isPaused = paused;
+        currentSpeed = speed;
+        slowmo(paused ? 0 : speed);
 
-      // Update pause button
-      const pauseBtn = document.getElementById('pause-btn');
-      const playIcon = pauseBtn.querySelector('.play-icon');
-      const pauseIcon = pauseBtn.querySelector('.pause-icon');
-      playIcon.style.display = paused ? 'block' : 'none';
-      pauseIcon.style.display = paused ? 'none' : 'block';
+        // Update pause button
+        const pauseBtn = document.getElementById("pause-btn");
+        const playIcon = pauseBtn.querySelector(".play-icon");
+        const pauseIcon = pauseBtn.querySelector(".pause-icon");
+        playIcon.style.display = paused ? "block" : "none";
+        pauseIcon.style.display = paused ? "none" : "block";
 
-      // Update preset buttons (only those with data-speed)
-      document.querySelectorAll('.preset-btn[data-speed]').forEach(btn => {
-        const btnSpeed = parseFloat(btn.dataset.speed);
-        btn.classList.toggle('active', btnSpeed === speed && !paused);
-      });
-    }
-
-    // Pause button
-    document.getElementById('pause-btn').addEventListener('click', () => {
-      updateSpeed(currentSpeed, !isPaused);
-    });
-
-    // Skip button - finish all animations
-    document.getElementById('skip-btn').addEventListener('click', () => {
-      // Finish all Web Animations
-      if (typeof document.getAnimations === 'function') {
-        document.getAnimations().forEach(anim => {
-          try { anim.finish(); } catch (e) { try { anim.cancel(); } catch (e2) {} }
+        // Update preset buttons (including infinity)
+        document.querySelectorAll(".preset-btn[data-speed]").forEach((btn) => {
+          const btnSpeed =
+            btn.dataset.speed === "Infinity"
+              ? Infinity
+              : parseFloat(btn.dataset.speed);
+          btn.classList.toggle("active", btnSpeed === speed && !paused);
         });
       }
-      // Flash the button
-      const btn = document.getElementById('skip-btn');
-      btn.style.background = 'var(--accent)';
-      btn.style.color = 'var(--bg)';
-      setTimeout(() => { btn.style.background = ''; btn.style.color = ''; }, 200);
-    });
 
-    // Preset buttons (only those with data-speed)
-    document.querySelectorAll('.preset-btn[data-speed]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        updateSpeed(parseFloat(btn.dataset.speed), false);
+      // Pause button
+      document.getElementById("pause-btn").addEventListener("click", () => {
+        updateSpeed(currentSpeed, !isPaused);
       });
-    });
 
-    // requestAnimationFrame animation
-    const rafBox = document.getElementById('raf-box');
-    const rafContainer = document.getElementById('raf-container');
-    let startTime = null;
+      // Preset buttons (including infinity)
+      document.querySelectorAll(".preset-btn[data-speed]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const speed =
+            btn.dataset.speed === "Infinity"
+              ? Infinity
+              : parseFloat(btn.dataset.speed);
+          updateSpeed(speed, false);
 
-    function animateRAF(timestamp) {
-      if (!startTime) startTime = timestamp;
-      const elapsed = timestamp - startTime;
-      const angle = elapsed * 0.001;
-      const containerWidth = rafContainer.offsetWidth;
-      const x = Math.sin(angle) * (containerWidth / 2 - 40);
-      const rotation = angle * 50;
-      rafBox.style.transform = `translateX(${x}px) rotate(${rotation}deg)`;
+          // If infinity, jump videos to the end and pause
+          if (speed === Infinity) {
+            document.querySelectorAll("video, audio").forEach((media) => {
+              if (media.duration && isFinite(media.duration)) {
+                media.currentTime = media.duration;
+                media.pause();
+              }
+            });
+          }
+        });
+      });
+
+      // requestAnimationFrame animation
+      const rafBox = document.getElementById("raf-box");
+      const rafContainer = document.getElementById("raf-container");
+      let startTime = null;
+
+      function animateRAF(timestamp) {
+        if (!startTime) startTime = timestamp;
+        const elapsed = timestamp - startTime;
+        const angle = elapsed * 0.001;
+        const containerWidth = rafContainer.offsetWidth;
+        const x = Math.sin(angle) * (containerWidth / 2 - 40);
+        const rotation = angle * 50;
+        rafBox.style.transform = `translateX(${x}px) rotate(${rotation}deg)`;
+        requestAnimationFrame(animateRAF);
+      }
       requestAnimationFrame(animateRAF);
-    }
-    requestAnimationFrame(animateRAF);
 
-    // Web Animations API
-    const waaBox = document.getElementById('waa-box');
-    waaBox.animate([
-      { transform: 'translateY(0) scale(1)', offset: 0 },
-      { transform: 'translateY(-30px) scale(1.1)', offset: 0.5 },
-      { transform: 'translateY(0) scale(1)', offset: 1 }
-    ], {
-      duration: 1500,
-      iterations: Infinity,
-      easing: 'ease-in-out'
-    });
-  </script>
-</body>
+      // Web Animations API
+      const waaBox = document.getElementById("waa-box");
+      waaBox.animate(
+        [
+          { transform: "translateY(0) scale(1)", offset: 0 },
+          { transform: "translateY(-30px) scale(1.1)", offset: 0.5 },
+          { transform: "translateY(0) scale(1)", offset: 1 },
+        ],
+        {
+          duration: 1500,
+          iterations: Infinity,
+          easing: "ease-in-out",
+        },
+      );
+    </script>
+  </body>
 </html>
