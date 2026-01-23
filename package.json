@@ -1,6 +1,6 @@
 {
   "name": "slowmo",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "description": "Universal slow-motion control for web animations - CSS, videos, GSAP, Three.js, and more",
   "type": "module",
   "main": "./dist/slowmo.cjs",
@@ -14,7 +14,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "scripts": {
     "dev": "vite demo",
@@ -23,7 +24,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "release:patch": "npm version patch && npm publish",
+    "release:minor": "npm version minor && npm publish",
+    "release:major": "npm version major && npm publish"
   },
   "keywords": [
     "animation",
@@ -38,6 +42,14 @@
   ],
   "author": "",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/seflless/slowmo.git"
+  },
+  "homepage": "https://github.com/seflless/slowmo#readme",
+  "bugs": {
+    "url": "https://github.com/seflless/slowmo/issues"
+  },
   "devDependencies": {
     "@types/node": "^20.11.0",
     "typescript": "^5.3.3",
