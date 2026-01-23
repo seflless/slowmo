@@ -1,0 +1,5 @@
+{
+  "buildCommand": "pnpm run build:demo",
+  "outputDirectory": "dist-demo",
+  "installCommand": "pnpm install"
+}
