@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>slowmo - Universal Animation Slow Motion</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0a;
+      color: #fff;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 300;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 2rem;
+    }
+
+    /* Controls */
+    .controls {
+      background: #151515;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      flex-wrap: wrap;
+    }
+
+    .speed-display {
+      font-size: 2rem;
+      font-weight: 600;
+      min-width: 100px;
+      color: #667eea;
+    }
+
+    .slider-container {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .slider-container label {
+      display: block;
+      font-size: 0.85rem;
+      color: #666;
+      margin-bottom: 0.5rem;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      height: 8px;
+      border-radius: 4px;
+      background: #333;
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #667eea;
+      cursor: pointer;
+    }
+
+    .presets {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .preset-btn {
+      padding: 0.5rem 1rem;
+      border: 1px solid #333;
+      border-radius: 6px;
+      background: transparent;
+      color: #fff;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-size: 0.9rem;
+    }
+
+    .preset-btn:hover {
+      background: #222;
+      border-color: #667eea;
+    }
+
+    .preset-btn.active {
+      background: #667eea;
+      border-color: #667eea;
+    }
+
+    /* Demo Grid */
+    .demos {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .demo-card {
+      background: #151515;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .demo-header {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid #222;
+    }
+
+    .demo-header h3 {
+      font-size: 1rem;
+      font-weight: 500;
+      margin-bottom: 0.25rem;
+    }
+
+    .demo-header p {
+      font-size: 0.8rem;
+      color: #666;
+    }
+
+    .demo-content {
+      height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Animation boxes */
+    .box {
+      width: 60px;
+      height: 60px;
+      border-radius: 8px;
+    }
+
+    /* 1. CSS Animation */
+    .css-anim-box {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      animation: spin 2s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    /* 2. requestAnimationFrame */
+    .raf-box {
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+      position: absolute;
+    }
+
+    /* 3. Web Animations API */
+    .waa-box {
+      background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    }
+
+    /* 4. Video */
+    .demo-content video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    /* Canvas */
+    .demo-content canvas {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+  <h1>slowmo</h1>
+  <p class="subtitle">Universal slow-motion control for web animations</p>
+
+  <div class="controls">
+    <div class="speed-display" id="speed-display">1.0x</div>
+    <div class="slider-container">
+      <label>Speed</label>
+      <input type="range" id="speed-slider" min="0.01" max="4" step="0.01" value="1">
+    </div>
+    <div class="presets">
+      <button class="preset-btn" data-speed="0">Pause</button>
+      <button class="preset-btn" data-speed="0.01">0.01x</button>
+      <button class="preset-btn" data-speed="0.1">0.1x</button>
+      <button class="preset-btn" data-speed="0.25">0.25x</button>
+      <button class="preset-btn" data-speed="0.5">0.5x</button>
+      <button class="preset-btn active" data-speed="1">1x</button>
+      <button class="preset-btn" data-speed="2">2x</button>
+      <button class="preset-btn" data-speed="4">4x</button>
+    </div>
+  </div>
+
+  <div class="demos">
+    <!-- CSS Animation -->
+    <div class="demo-card">
+      <div class="demo-header">
+        <h3>CSS Animation</h3>
+        <p>@keyframes with animation property</p>
+      </div>
+      <div class="demo-content">
+        <div class="box css-anim-box"></div>
+      </div>
+    </div>
+
+    <!-- requestAnimationFrame -->
+    <div class="demo-card">
+      <div class="demo-header">
+        <h3>requestAnimationFrame</h3>
+        <p>JavaScript-driven animation loop</p>
+      </div>
+      <div class="demo-content" id="raf-container">
+        <div class="box raf-box" id="raf-box"></div>
+        <div id="raf-debug" style="position:absolute;bottom:8px;left:8px;font-size:10px;color:#666;font-family:monospace;"></div>
+      </div>
+    </div>
+
+    <!-- Web Animations API -->
+    <div class="demo-card">
+      <div class="demo-header">
+        <h3>Web Animations API</h3>
+        <p>Element.animate() method</p>
+      </div>
+      <div class="demo-content">
+        <div class="box waa-box" id="waa-box"></div>
+      </div>
+    </div>
+
+    <!-- Video -->
+    <div class="demo-card">
+      <div class="demo-header">
+        <h3>Video</h3>
+        <p>HTML5 video element</p>
+      </div>
+      <div class="demo-content">
+        <video id="demo-video" autoplay muted loop playsinline>
+          <source src="https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" type="video/mp4">
+        </video>
+      </div>
+    </div>
+
+    <!-- Audio -->
+    <div class="demo-card">
+      <div class="demo-header">
+        <h3>Audio</h3>
+        <p>HTML5 audio element (click to play)</p>
+      </div>
+      <div class="demo-content" style="flex-direction:column;gap:12px;">
+        <audio id="demo-audio" loop controls style="width:90%;">
+          <source src="https://upload.wikimedia.org/wikipedia/commons/c/c8/Example.ogg" type="audio/ogg">
+          <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg">
+        </audio>
+        <div style="font-size:11px;color:#666;">Slower = lower pitch, faster = higher pitch</div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { slowmo } from '../src/index.ts';
+
+    // Speed controls
+    const slider = document.getElementById('speed-slider');
+    const display = document.getElementById('speed-display');
+    const presets = document.querySelectorAll('.preset-btn');
+
+    function updateSpeed(speed) {
+      slowmo(speed);
+      display.textContent = speed === 0 ? 'Paused' : `${speed.toFixed(2)}x`;
+      slider.value = speed;
+
+      presets.forEach(btn => {
+        btn.classList.toggle('active', parseFloat(btn.dataset.speed) === speed);
+      });
+    }
+
+    slider.addEventListener('input', (e) => {
+      updateSpeed(parseFloat(e.target.value));
+    });
+
+    presets.forEach(btn => {
+      btn.addEventListener('click', () => {
+        updateSpeed(parseFloat(btn.dataset.speed));
+      });
+    });
+
+    // requestAnimationFrame animation (time-based)
+    const rafBox = document.getElementById('raf-box');
+    const rafContainer = document.getElementById('raf-container');
+    const rafDebug = document.getElementById('raf-debug');
+    let startTime = null;
+    let lastTimestamp = 0;
+
+    function animateRAF(timestamp) {
+      if (!startTime) startTime = timestamp;
+      const elapsed = timestamp - startTime;
+      const delta = timestamp - lastTimestamp;
+      lastTimestamp = timestamp;
+
+      // Show debug info
+      rafDebug.textContent = `ts: ${Math.round(timestamp)} | delta: ${delta.toFixed(1)}ms`;
+
+      // Use elapsed time to calculate position (not frame count)
+      const angle = elapsed * 0.001; // radians per millisecond
+      const containerWidth = rafContainer.offsetWidth;
+      const x = Math.sin(angle) * (containerWidth / 2 - 50);
+      const rotation = angle * 50;
+      rafBox.style.transform = `translateX(${x}px) rotate(${rotation}deg)`;
+      requestAnimationFrame(animateRAF);
+    }
+    requestAnimationFrame(animateRAF);
+
+    // Web Animations API
+    const waaBox = document.getElementById('waa-box');
+    waaBox.animate([
+      { transform: 'translateY(0) scale(1)', offset: 0 },
+      { transform: 'translateY(-50px) scale(1.1)', offset: 0.5 },
+      { transform: 'translateY(0) scale(1)', offset: 1 }
+    ], {
+      duration: 1500,
+      iterations: Infinity,
+      easing: 'ease-in-out'
+    });
+  </script>
+</body>
+</html>
