@@ -1,0 +1,25 @@
+demo/index.html
+  e5178401fb331c7f 644,823,831,833
+README.md
+  e5178401fb331c7f 3,11-13,99-102,111
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.37",
+  "base_commit_sha": "4ac360fe637c67d863f62e756e53abdf2f0c111d",
+  "prompts": {
+    "e5178401fb331c7f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eee290d7-da47-4aec-8948-48d08edb6569",
+        "model": "<synthetic>"
+      },
+      "human_author": "Francois Laberge <francoislaberge@gmail.com>",
+      "messages": [],
+      "total_additions": 15,
+      "total_deletions": 13,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    }
+  }
+}
