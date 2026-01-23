@@ -1,0 +1,23 @@
+package.json
+  9f2639d6c63c2389 17-18,27-30,45-52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.37",
+  "base_commit_sha": "447571bf88b02b3249091cf247cb296ee63c0d0c",
+  "prompts": {
+    "9f2639d6c63c2389": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "26a88a03-5e82-4e25-9c8d-49fdcfa22d01",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Francois Laberge <francoislaberge@gmail.com>",
+      "messages": [],
+      "total_additions": 14,
+      "total_deletions": 2,
+      "accepted_lines": 14,
+      "overriden_lines": 0
+    }
+  }
+}
