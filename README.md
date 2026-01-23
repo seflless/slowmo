@@ -1,6 +1,6 @@
 # slowmo
 
-Slow down or speed up time, to debug or study web animations.
+Control time on any web page. Debug, study, or speedrun animations.
 
 <!-- TODO: Add hero GIF/video here -->
 <!-- ![slowmo demo](./assets/demo.gif) -->
@@ -8,14 +8,17 @@ Slow down or speed up time, to debug or study web animations.
 ## Why?
 
 - **Debug animations** - Slow things down to see exactly what's happening
-- **Record demos** - Capture smooth slow-motion footage for product videos
-- **Create effects** - Add dramatic slow-mo moments to your UI
+- **Study details** - Appreciate the little details on why something looks so neat
+- **Speedrun UIs** - Skip or skim quickly through any animation gated experience
+- **Game difficulty** - Slower gives you better reflexes, faster challenges you more
 
 ## Install
 
 ```bash
 npm install slowmo
 ```
+
+> **Chrome Extension coming soon** - Control any website's animations without writing code.
 
 ## Quick Start
 
@@ -82,8 +85,20 @@ Add `data-slowmo-exclude` to opt out specific elements:
 ## Limitations
 
 - **Frame-based animations** that don't use timestamps can't be smoothly slowed (they increment by a fixed amount each frame regardless of time)
-- **Libraries that cache time references** before slowmo loads may not be affected
+- **Libraries that cache time function references** before slowmo loads may not be affected
 - **Video/audio** have browser-imposed limits (~0.0625x to 16x in Chrome)
+- **iframes** won't be affected unless slowmo is also loaded inside them
+- **Web Workers & Worklets** run in separate threads with their own timing APIs that can't be patched from the main thread (audio worklets, paint worklets, animation worklets)
+- **WebGL shaders** with custom time uniforms need manual integration
+- **Server-synced animations** that rely on server timestamps rather than local time
+
+## Contributing
+
+Open to contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup and Chrome extension testing instructions.
+
+## Inspiration
+
+Inspired by [agentation](https://agentation.dev/) by [Benji Taylor](https://x.com/BenjiTaylor) and his related blog posts [[1]](https://benji.org/annotating) [[2]](https://benji.org/agentation)
 
 ## License
 
@@ -93,4 +108,4 @@ MIT
 
 <!-- TODO: Update with actual website URL -->
 
-[Website](https://slowmo.dev) · [GitHub](https://github.com/seflless/slowmo) · [npm](https://www.npmjs.com/package/slowmo)
+[website](https://slowmo.dev) · [github](https://github.com/seflless/slowmo) · [npm](https://www.npmjs.com/package/slowmo)
