@@ -3,169 +3,437 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>slowmo - Universal Animation Slow Motion</title>
+  <title>slowmo - Control time on any web page</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --bg: #0c0a09;
+      --bg-elevated: #1c1917;
+      --bg-hover: #292524;
+      --border: #292524;
+      --border-subtle: #1c1917;
+      --text: #fafaf9;
+      --text-muted: #a8a29e;
+      --text-dim: #57534e;
+      --accent: #f59e0b;
+      --accent-muted: #d97706;
+      --accent-glow: rgba(245, 158, 11, 0.15);
+      --radius: 10px;
+      --radius-sm: 6px;
+      --font-sans: 'Instrument Sans', -apple-system, sans-serif;
+      --font-mono: 'DM Mono', 'SF Mono', monospace;
+    }
+
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
     }
 
+    html {
+      scroll-behavior: smooth;
+    }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #0a0a0a;
-      color: #fff;
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--text);
       min-height: 100vh;
-      padding: 2rem;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
     }
 
-    .container {
-      max-width: 900px;
+    /* Grain overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+      opacity: 0.03;
+      pointer-events: none;
+      z-index: 1000;
+    }
+
+    /* Layout */
+    .page {
+      max-width: 1000px;
       margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
     }
 
-    h1 {
-      font-size: 2.5rem;
-      font-weight: 300;
-      margin-bottom: 0.5rem;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 0;
+      margin-bottom: 3rem;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .logo {
+      font-size: 1.125rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    .nav {
+      display: flex;
+      gap: 1.5rem;
+    }
+
+    .nav a {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    .nav a:hover {
+      color: var(--text);
+    }
+
+    /* Hero */
+    .hero {
+      text-align: center;
+      margin-bottom: 4rem;
+    }
+
+    .hero h1 {
+      font-size: clamp(2.5rem, 8vw, 4rem);
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      margin-bottom: 0.75rem;
+      background: linear-gradient(135deg, var(--text) 0%, var(--text-muted) 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
     }
 
-    .container {
+    .hero .tagline {
+      font-size: 1.125rem;
+      color: var(--text-muted);
+      margin-bottom: 2rem;
+      max-width: 400px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* Install box */
+    .install-box {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.625rem 0.75rem 0.625rem 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .install-box code {
+      font-family: var(--font-mono);
+      font-size: 0.875rem;
+      color: var(--text);
+    }
+
+    .install-box .copy-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border: none;
+      background: var(--bg-hover);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.15s;
+      color: var(--text-muted);
+    }
+
+    .install-box .copy-btn:hover {
+      background: var(--border);
+      color: var(--text);
+    }
+
+    .install-box .copy-btn.copied {
+      color: var(--accent);
+    }
+
+    .badges {
+      display: flex;
+      justify-content: center;
+      gap: 0.75rem;
+      font-size: 0.8125rem;
+      color: var(--text-dim);
+    }
+
+    .badge {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+    }
+
+    .badge svg {
+      opacity: 0.6;
+    }
+
+    /* Use cases */
+    .use-cases {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 2rem;
+    }
+
+    .use-case {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.875rem;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+    }
+
+    .use-case svg {
+      width: 14px;
+      height: 14px;
+      opacity: 0.7;
+    }
+
+    /* Floating Controller */
+    .controller-section {
+      position: relative;
+      padding: 3rem 0;
+      margin-bottom: 3rem;
+    }
+
+    .controller-section h2 {
+      text-align: center;
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-dim);
+      margin-bottom: 1.5rem;
+    }
+
+    .controller-wrapper {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* The actual controller - reusable component */
+    .slowmo-controller {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 0.5rem;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.03);
+      user-select: none;
+    }
+
+    .controller-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border: none;
+      background: transparent;
+      border-radius: 50%;
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: all 0.15s;
+    }
+
+    .controller-btn:hover {
+      background: var(--bg-hover);
+      color: var(--text);
+    }
+
+    .controller-btn.active {
+      background: var(--accent);
+      color: var(--bg);
+    }
+
+    .controller-btn svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .controller-speed {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0 0.5rem;
+      min-width: 80px;
+      justify-content: center;
+    }
+
+    .speed-value {
+      font-family: var(--font-mono);
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--text);
+      min-width: 48px;
       text-align: center;
     }
 
-    .subtitle {
-      color: #666;
-      margin-bottom: 2rem;
+    .speed-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
     }
 
-    /* Controls */
-    .controls {
-      background: #151515;
-      border-radius: 12px;
-      padding: 1.5rem;
-      margin-bottom: 2rem;
+    .speed-arrow {
       display: flex;
       align-items: center;
-      gap: 2rem;
-      flex-wrap: wrap;
-    }
-
-    .speed-display {
-      font-size: 2rem;
-      font-weight: 600;
-      min-width: 100px;
-      color: #667eea;
-    }
-
-    .slider-container {
-      flex: 1;
-      min-width: 200px;
-    }
-
-    .slider-container label {
-      display: block;
-      font-size: 0.85rem;
-      color: #666;
-      margin-bottom: 0.5rem;
-    }
-
-    input[type="range"] {
-      width: 100%;
-      height: 8px;
-      border-radius: 4px;
-      background: #333;
-      outline: none;
-      -webkit-appearance: none;
-    }
-
-    input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
+      justify-content: center;
       width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      background: #667eea;
+      height: 14px;
+      border: none;
+      background: transparent;
       cursor: pointer;
+      color: var(--text-dim);
+      transition: color 0.15s;
+      padding: 0;
     }
 
-    .presets {
+    .speed-arrow:hover {
+      color: var(--text);
+    }
+
+    .speed-arrow svg {
+      width: 12px;
+      height: 12px;
+    }
+
+    .controller-presets {
       display: flex;
-      gap: 0.5rem;
+      gap: 2px;
+      padding: 0 0.25rem;
     }
 
     .preset-btn {
-      padding: 0.5rem 1rem;
-      border: 1px solid #333;
-      border-radius: 6px;
+      padding: 0.375rem 0.625rem;
+      border: none;
       background: transparent;
-      color: #fff;
+      border-radius: 100px;
       cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-dim);
       transition: all 0.15s;
-      font-size: 0.9rem;
     }
 
     .preset-btn:hover {
-      background: #222;
-      border-color: #667eea;
+      background: var(--bg-hover);
+      color: var(--text-muted);
     }
 
     .preset-btn.active {
-      background: #667eea;
-      border-color: #667eea;
+      background: var(--accent-glow);
+      color: var(--accent);
     }
 
     /* Demo Grid */
-    .demos {
+    .demos-section {
+      margin-bottom: 4rem;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+    }
+
+    .section-header h2 {
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-dim);
+    }
+
+    .demos-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 1.5rem;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+    }
+
+    @media (max-width: 768px) {
+      .demos-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 480px) {
+      .demos-grid {
+        grid-template-columns: 1fr;
+      }
     }
 
     .demo-card {
-      background: #151515;
-      border-radius: 12px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
       overflow: hidden;
+      transition: border-color 0.15s;
     }
 
-    .demo-header {
-      padding: 1rem 1.25rem;
-      border-bottom: 1px solid #222;
+    .demo-card:hover {
+      border-color: var(--border);
     }
 
-    .demo-header h3 {
-      font-size: 1rem;
-      font-weight: 500;
-      margin-bottom: 0.25rem;
-    }
-
-    .demo-header p {
-      font-size: 0.8rem;
-      color: #666;
-    }
-
-    .demo-content {
-      height: 200px;
+    .demo-visual {
+      aspect-ratio: 1;
       display: flex;
       align-items: center;
       justify-content: center;
       position: relative;
       overflow: hidden;
+      background: var(--bg);
     }
 
-    /* Animation boxes */
-    .box {
-      width: 60px;
-      height: 60px;
+    .demo-label {
+      padding: 0.625rem 0.75rem;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .demo-label h3 {
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 0.125rem;
+    }
+
+    .demo-label p {
+      font-size: 0.6875rem;
+      color: var(--text-dim);
+    }
+
+    /* Animation elements */
+    .anim-box {
+      width: 40px;
+      height: 40px;
       border-radius: 8px;
     }
 
-    /* 1. CSS Animation */
-    .css-anim-box {
-      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    .css-box {
+      background: linear-gradient(135deg, #f472b6 0%, #fb7185 100%);
       animation: spin 2s linear infinite;
     }
 
@@ -174,167 +442,676 @@
       to { transform: rotate(360deg); }
     }
 
-    /* 2. requestAnimationFrame */
     .raf-box {
-      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+      background: linear-gradient(135deg, #38bdf8 0%, #22d3ee 100%);
       position: absolute;
     }
 
-    /* 3. Web Animations API */
     .waa-box {
-      background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+      background: linear-gradient(135deg, #4ade80 0%, #34d399 100%);
     }
 
-    /* 4. Video */
-    .demo-content video {
+    .demo-visual video {
       width: 100%;
       height: 100%;
       object-fit: cover;
     }
 
-    /* Canvas */
-    .demo-content canvas {
+    /* Game Demo */
+    .game-section {
+      margin-bottom: 4rem;
+    }
+
+    .game-section h2 {
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-dim);
+      margin-bottom: 1.5rem;
+    }
+
+    .game-container {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .game-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .game-header h3 {
+      font-size: 0.9375rem;
+      font-weight: 600;
+    }
+
+    .game-header p {
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+    }
+
+    /* Difficulty controller */
+    .difficulty-controller {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 0.25rem;
+    }
+
+    .diff-btn {
+      padding: 0.375rem 0.75rem;
+      border: none;
+      background: transparent;
+      border-radius: 100px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--text-dim);
+      transition: all 0.15s;
+    }
+
+    .diff-btn:hover {
+      color: var(--text-muted);
+    }
+
+    .diff-btn.active {
+      background: var(--accent);
+      color: var(--bg);
+    }
+
+    .game-canvas-wrapper {
+      position: relative;
+      height: 300px;
+      background: linear-gradient(180deg, var(--bg) 0%, #18181b 100%);
+    }
+
+    #game-canvas {
       width: 100%;
       height: 100%;
+      display: block;
     }
+
+    .game-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(12, 10, 9, 0.85);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+
+    .game-overlay.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .game-overlay h4 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .game-overlay p {
+      color: var(--text-muted);
+      margin-bottom: 1.5rem;
+    }
+
+    .game-btn {
+      padding: 0.625rem 1.25rem;
+      background: var(--accent);
+      border: none;
+      border-radius: 100px;
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--bg);
+      transition: transform 0.1s, box-shadow 0.15s;
+    }
+
+    .game-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px var(--accent-glow);
+    }
+
+    .game-score {
+      position: absolute;
+      top: 1rem;
+      left: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+
+    /* API Section */
+    .api-section {
+      margin-bottom: 4rem;
+    }
+
+    .api-section h2 {
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-dim);
+      margin-bottom: 1.5rem;
+    }
+
+    .api-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }
+
+    @media (max-width: 640px) {
+      .api-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .api-card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+    }
+
+    .api-card h3 {
+      font-size: 0.875rem;
+      font-weight: 500;
+      margin-bottom: 0.75rem;
+    }
+
+    .api-card pre {
+      background: var(--bg);
+      border-radius: var(--radius-sm);
+      padding: 0.875rem 1rem;
+      overflow-x: auto;
+    }
+
+    .api-card code {
+      font-family: var(--font-mono);
+      font-size: 0.8125rem;
+      line-height: 1.6;
+      color: var(--text-muted);
+    }
+
+    .api-card code .keyword {
+      color: #c084fc;
+    }
+
+    .api-card code .string {
+      color: #4ade80;
+    }
+
+    .api-card code .function {
+      color: #60a5fa;
+    }
+
+    .api-card code .number {
+      color: var(--accent);
+    }
+
+    .api-card code .comment {
+      color: var(--text-dim);
+    }
+
+    /* Footer */
+    .footer {
+      border-top: 1px solid var(--border-subtle);
+      padding-top: 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .footer-left {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .footer-brand {
+      font-weight: 600;
+      font-size: 0.9375rem;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 1.25rem;
+    }
+
+    .footer-links a {
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    .footer-links a:hover {
+      color: var(--text);
+    }
+
+    .footer-right {
+      font-size: 0.8125rem;
+      color: var(--text-dim);
+    }
+
+    /* Chrome extension badge */
+    .extension-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.875rem;
+      background: linear-gradient(135deg, var(--accent-glow) 0%, transparent 100%);
+      border: 1px solid var(--accent-muted);
+      border-radius: 100px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--accent);
+      margin-left: 1rem;
+    }
+
+    .extension-badge::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* Staggered animations for page load */
+    .fade-up {
+      opacity: 0;
+      transform: translateY(20px);
+      animation: fadeUp 0.6s ease forwards;
+    }
+
+    @keyframes fadeUp {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .fade-up:nth-child(1) { animation-delay: 0s; }
+    .fade-up:nth-child(2) { animation-delay: 0.1s; }
+    .fade-up:nth-child(3) { animation-delay: 0.2s; }
+    .fade-up:nth-child(4) { animation-delay: 0.3s; }
   </style>
 </head>
 <body>
-  <div class="container">
-  <h1>slowmo</h1>
-  <p class="subtitle">Slow down or speed up time, to debug or study web animations.</p>
+  <div class="page">
+    <!-- Header -->
+    <header class="header fade-up">
+      <a href="#" class="logo">slowmo</a>
+      <nav class="nav">
+        <a href="https://github.com/seflless/slowmo">GitHub</a>
+        <a href="https://www.npmjs.com/package/slowmo">npm</a>
+        <span class="extension-badge">Chrome Extension Soon</span>
+      </nav>
+    </header>
 
-  <div class="controls">
-    <div class="speed-display" id="speed-display">1.0x</div>
-    <div class="slider-container">
-      <label>Speed</label>
-      <input type="range" id="speed-slider" min="0.01" max="4" step="0.01" value="1">
-    </div>
-    <div class="presets">
-      <button class="preset-btn" data-speed="0">Pause</button>
-      <button class="preset-btn" data-speed="0.01">0.01x</button>
-      <button class="preset-btn" data-speed="0.1">0.1x</button>
-      <button class="preset-btn" data-speed="0.25">0.25x</button>
-      <button class="preset-btn" data-speed="0.5">0.5x</button>
-      <button class="preset-btn active" data-speed="1">1x</button>
-      <button class="preset-btn" data-speed="2">2x</button>
-      <button class="preset-btn" data-speed="4">4x</button>
-    </div>
-  </div>
+    <!-- Hero -->
+    <section class="hero fade-up">
+      <h1>slowmo</h1>
+      <p class="tagline">Control time on any web page. Debug, study, or speedrun animations.</p>
 
-  <div class="demos">
-    <!-- CSS Animation -->
-    <div class="demo-card">
-      <div class="demo-header">
-        <h3>CSS Animation</h3>
-        <p>@keyframes with animation property</p>
+      <div class="install-box">
+        <code>npm install slowmo</code>
+        <button class="copy-btn" onclick="copyInstall()" title="Copy to clipboard">
+          <svg id="copy-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+          </svg>
+          <svg id="check-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </button>
       </div>
-      <div class="demo-content">
-        <div class="box css-anim-box"></div>
-      </div>
-    </div>
 
-    <!-- requestAnimationFrame -->
-    <div class="demo-card">
-      <div class="demo-header">
-        <h3>requestAnimationFrame</h3>
-        <p>JavaScript-driven animation loop</p>
+      <div class="badges">
+        <span class="badge">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+          </svg>
+          ~2KB gzipped
+        </span>
+        <span class="badge">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          Zero dependencies
+        </span>
       </div>
-      <div class="demo-content" id="raf-container">
-        <div class="box raf-box" id="raf-box"></div>
-        <div id="raf-debug" style="position:absolute;bottom:8px;left:8px;font-size:10px;color:#666;font-family:monospace;"></div>
-      </div>
-    </div>
 
-    <!-- Web Animations API -->
-    <div class="demo-card">
-      <div class="demo-header">
-        <h3>Web Animations API</h3>
-        <p>Element.animate() method</p>
+      <div class="use-cases">
+        <span class="use-case">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 20V10M18 20V4M6 20v-4"></path>
+          </svg>
+          Debug animations
+        </span>
+        <span class="use-case">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 16v-4M12 8h.01"></path>
+          </svg>
+          Study details
+        </span>
+        <span class="use-case">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+          Speedrun UIs
+        </span>
+        <span class="use-case">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="6" width="20" height="12" rx="2"></rect>
+            <path d="M12 12h.01M17 12h.01M7 12h.01"></path>
+          </svg>
+          Game difficulty
+        </span>
       </div>
-      <div class="demo-content">
-        <div class="box waa-box" id="waa-box"></div>
-      </div>
-    </div>
+    </section>
 
-    <!-- Video -->
-    <div class="demo-card">
-      <div class="demo-header">
-        <h3>Video</h3>
-        <p>HTML5 video element</p>
-      </div>
-      <div class="demo-content">
-        <video id="demo-video" autoplay muted loop playsinline>
-          <source src="https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" type="video/mp4">
-        </video>
-      </div>
-    </div>
+    <!-- Controller -->
+    <section class="controller-section fade-up">
+      <h2>Try It</h2>
+      <div class="controller-wrapper">
+        <div class="slowmo-controller" id="main-controller">
+          <button class="controller-btn" id="pause-btn" title="Pause">
+            <svg class="play-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            <svg class="pause-icon" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="4" width="4" height="16" rx="1"></rect>
+              <rect x="14" y="4" width="4" height="16" rx="1"></rect>
+            </svg>
+          </button>
 
-    <!-- Audio -->
-    <div class="demo-card">
-      <div class="demo-header">
-        <h3>Audio</h3>
-        <p>HTML5 audio element (click to play)</p>
+          <div class="controller-speed">
+            <span class="speed-value" id="speed-display">1.0x</span>
+            <div class="speed-controls">
+              <button class="speed-arrow" id="speed-up" title="Faster">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="18 15 12 9 6 15"></polyline>
+                </svg>
+              </button>
+              <button class="speed-arrow" id="speed-down" title="Slower">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="controller-presets">
+            <button class="preset-btn" data-speed="0.1">0.1x</button>
+            <button class="preset-btn" data-speed="0.25">0.25x</button>
+            <button class="preset-btn" data-speed="0.5">0.5x</button>
+            <button class="preset-btn active" data-speed="1">1x</button>
+            <button class="preset-btn" data-speed="2">2x</button>
+          </div>
+        </div>
       </div>
-      <div class="demo-content" style="flex-direction:column;gap:12px;">
-        <audio id="demo-audio" loop controls style="width:90%;">
-          <source src="https://upload.wikimedia.org/wikipedia/commons/c/c8/Example.ogg" type="audio/ogg">
-          <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg">
-        </audio>
-        <div style="font-size:11px;color:#666;">Slower = lower pitch, faster = higher pitch</div>
+    </section>
+
+    <!-- Demos -->
+    <section class="demos-section fade-up">
+      <div class="section-header">
+        <h2>Live Demos</h2>
       </div>
-    </div>
-  </div>
+      <div class="demos-grid">
+        <div class="demo-card">
+          <div class="demo-visual">
+            <div class="anim-box css-box"></div>
+          </div>
+          <div class="demo-label">
+            <h3>CSS Animation</h3>
+            <p>@keyframes</p>
+          </div>
+        </div>
+
+        <div class="demo-card">
+          <div class="demo-visual" id="raf-container">
+            <div class="anim-box raf-box" id="raf-box"></div>
+          </div>
+          <div class="demo-label">
+            <h3>requestAnimationFrame</h3>
+            <p>JS animation loop</p>
+          </div>
+        </div>
+
+        <div class="demo-card">
+          <div class="demo-visual">
+            <div class="anim-box waa-box" id="waa-box"></div>
+          </div>
+          <div class="demo-label">
+            <h3>Web Animations API</h3>
+            <p>element.animate()</p>
+          </div>
+        </div>
+
+        <div class="demo-card">
+          <div class="demo-visual">
+            <video id="demo-video" autoplay muted loop playsinline>
+              <source src="https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" type="video/mp4">
+            </video>
+          </div>
+          <div class="demo-label">
+            <h3>Video</h3>
+            <p>HTML5 video</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Game Demo -->
+    <section class="game-section fade-up">
+      <h2>Game Difficulty Demo</h2>
+      <div class="game-container">
+        <div class="game-header">
+          <div>
+            <h3>Dodge the Blocks</h3>
+            <p>Use arrow keys or tap to move. Slower = easier, faster = harder.</p>
+          </div>
+          <div class="difficulty-controller">
+            <button class="diff-btn" data-speed="0.5">Easy</button>
+            <button class="diff-btn active" data-speed="1">Normal</button>
+            <button class="diff-btn" data-speed="1.5">Hard</button>
+            <button class="diff-btn" data-speed="2">Insane</button>
+          </div>
+        </div>
+        <div class="game-canvas-wrapper">
+          <canvas id="game-canvas"></canvas>
+          <div class="game-score">Score: <span id="game-score-value">0</span></div>
+          <div class="game-overlay visible" id="game-overlay">
+            <h4 id="overlay-title">Dodge the Blocks</h4>
+            <p id="overlay-message">Arrow keys or tap sides to move</p>
+            <button class="game-btn" id="game-start-btn">Start Game</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- API -->
+    <section class="api-section fade-up">
+      <h2>Quick Start</h2>
+      <div class="api-grid">
+        <div class="api-card">
+          <h3>Basic Usage</h3>
+          <pre><code><span class="keyword">import</span> { slowmo } <span class="keyword">from</span> <span class="string">"slowmo"</span>;
+
+<span class="comment">// Half speed</span>
+<span class="function">slowmo</span>(<span class="number">0.5</span>);
+
+<span class="comment">// Double speed</span>
+<span class="function">slowmo</span>(<span class="number">2</span>);
+
+<span class="comment">// Pause</span>
+<span class="function">slowmo</span>(<span class="number">0</span>);</code></pre>
+        </div>
+
+        <div class="api-card">
+          <h3>Full API</h3>
+          <pre><code>slowmo.<span class="function">setSpeed</span>(<span class="number">0.5</span>);
+slowmo.<span class="function">pause</span>();
+slowmo.<span class="function">play</span>();
+slowmo.<span class="function">reset</span>();
+slowmo.<span class="function">getSpeed</span>();</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer fade-up">
+      <div class="footer-left">
+        <span class="footer-brand">slowmo</span>
+        <div class="footer-links">
+          <a href="https://github.com/seflless/slowmo">GitHub</a>
+          <a href="https://www.npmjs.com/package/slowmo">npm</a>
+          <a href="https://github.com/seflless/slowmo/issues">Issues</a>
+        </div>
+      </div>
+      <div class="footer-right">MIT License</div>
+    </footer>
   </div>
 
   <script type="module">
     import { slowmo } from '../src/index.ts';
 
-    // Speed controls
-    const slider = document.getElementById('speed-slider');
-    const display = document.getElementById('speed-display');
-    const presets = document.querySelectorAll('.preset-btn');
+    // Copy install command
+    window.copyInstall = function() {
+      navigator.clipboard.writeText('npm install slowmo');
+      const copyIcon = document.getElementById('copy-icon');
+      const checkIcon = document.getElementById('check-icon');
+      const btn = document.querySelector('.copy-btn');
 
-    function updateSpeed(speed) {
-      slowmo(speed);
-      display.textContent = speed === 0 ? 'Paused' : `${speed.toFixed(2)}x`;
-      slider.value = speed;
+      copyIcon.style.display = 'none';
+      checkIcon.style.display = 'block';
+      btn.classList.add('copied');
 
-      presets.forEach(btn => {
-        btn.classList.toggle('active', parseFloat(btn.dataset.speed) === speed);
+      setTimeout(() => {
+        copyIcon.style.display = 'block';
+        checkIcon.style.display = 'none';
+        btn.classList.remove('copied');
+      }, 2000);
+    };
+
+    // Current speed state
+    let currentSpeed = 1;
+    let isPaused = false;
+
+    // Speed presets for stepping
+    const speedPresets = [0.1, 0.25, 0.5, 1, 2, 4];
+
+    function updateSpeed(speed, paused = false) {
+      isPaused = paused;
+      currentSpeed = speed;
+
+      if (paused) {
+        slowmo(0);
+        document.getElementById('speed-display').textContent = 'Paused';
+      } else {
+        slowmo(speed);
+        document.getElementById('speed-display').textContent = speed < 1
+          ? speed.toFixed(2) + 'x'
+          : speed.toFixed(1) + 'x';
+      }
+
+      // Update pause button
+      const pauseBtn = document.getElementById('pause-btn');
+      const playIcon = pauseBtn.querySelector('.play-icon');
+      const pauseIcon = pauseBtn.querySelector('.pause-icon');
+
+      if (paused) {
+        playIcon.style.display = 'block';
+        pauseIcon.style.display = 'none';
+        pauseBtn.classList.add('active');
+      } else {
+        playIcon.style.display = 'none';
+        pauseIcon.style.display = 'block';
+        pauseBtn.classList.remove('active');
+      }
+
+      // Update preset buttons
+      document.querySelectorAll('.preset-btn').forEach(btn => {
+        const btnSpeed = parseFloat(btn.dataset.speed);
+        btn.classList.toggle('active', btnSpeed === speed && !paused);
       });
     }
 
-    slider.addEventListener('input', (e) => {
-      updateSpeed(parseFloat(e.target.value));
+    // Pause button
+    document.getElementById('pause-btn').addEventListener('click', () => {
+      if (isPaused) {
+        updateSpeed(currentSpeed, false);
+      } else {
+        updateSpeed(currentSpeed, true);
+      }
     });
 
-    presets.forEach(btn => {
+    // Speed up/down buttons
+    document.getElementById('speed-up').addEventListener('click', () => {
+      const currentIndex = speedPresets.findIndex(s => s >= currentSpeed);
+      const nextIndex = Math.min(currentIndex + 1, speedPresets.length - 1);
+      updateSpeed(speedPresets[nextIndex], false);
+    });
+
+    document.getElementById('speed-down').addEventListener('click', () => {
+      const currentIndex = speedPresets.findIndex(s => s >= currentSpeed);
+      const prevIndex = Math.max(currentIndex - 1, 0);
+      updateSpeed(speedPresets[prevIndex], false);
+    });
+
+    // Preset buttons
+    document.querySelectorAll('.preset-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        updateSpeed(parseFloat(btn.dataset.speed));
+        updateSpeed(parseFloat(btn.dataset.speed), false);
       });
     });
 
-    // requestAnimationFrame animation (time-based)
+    // Difficulty buttons
+    document.querySelectorAll('.diff-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        updateSpeed(parseFloat(btn.dataset.speed), false);
+      });
+    });
+
+    // requestAnimationFrame animation
     const rafBox = document.getElementById('raf-box');
     const rafContainer = document.getElementById('raf-container');
-    const rafDebug = document.getElementById('raf-debug');
     let startTime = null;
-    let lastTimestamp = 0;
 
     function animateRAF(timestamp) {
       if (!startTime) startTime = timestamp;
       const elapsed = timestamp - startTime;
-      const delta = timestamp - lastTimestamp;
-      lastTimestamp = timestamp;
-
-      // Show debug info
-      rafDebug.textContent = `ts: ${Math.round(timestamp)} | delta: ${delta.toFixed(1)}ms`;
-
-      // Use elapsed time to calculate position (not frame count)
-      const angle = elapsed * 0.001; // radians per millisecond
+      const angle = elapsed * 0.001;
       const containerWidth = rafContainer.offsetWidth;
-      const x = Math.sin(angle) * (containerWidth / 2 - 50);
+      const x = Math.sin(angle) * (containerWidth / 2 - 40);
       const rotation = angle * 50;
       rafBox.style.transform = `translateX(${x}px) rotate(${rotation}deg)`;
       requestAnimationFrame(animateRAF);
@@ -345,13 +1122,156 @@
     const waaBox = document.getElementById('waa-box');
     waaBox.animate([
       { transform: 'translateY(0) scale(1)', offset: 0 },
-      { transform: 'translateY(-50px) scale(1.1)', offset: 0.5 },
+      { transform: 'translateY(-30px) scale(1.1)', offset: 0.5 },
       { transform: 'translateY(0) scale(1)', offset: 1 }
     ], {
       duration: 1500,
       iterations: Infinity,
       easing: 'ease-in-out'
     });
+
+    // Game
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d');
+    const overlay = document.getElementById('game-overlay');
+    const overlayTitle = document.getElementById('overlay-title');
+    const overlayMessage = document.getElementById('overlay-message');
+    const startBtn = document.getElementById('game-start-btn');
+    const scoreDisplay = document.getElementById('game-score-value');
+
+    let gameRunning = false;
+    let score = 0;
+    let player = { x: 0, y: 0, width: 40, height: 40 };
+    let obstacles = [];
+    let lastObstacleTime = 0;
+
+    function resizeCanvas() {
+      canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+      canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+      player.y = canvas.offsetHeight - 60;
+      player.x = canvas.offsetWidth / 2 - player.width / 2;
+    }
+
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    function startGame() {
+      gameRunning = true;
+      score = 0;
+      obstacles = [];
+      overlay.classList.remove('visible');
+      player.x = canvas.offsetWidth / 2 - player.width / 2;
+      lastObstacleTime = performance.now();
+      gameLoop();
+    }
+
+    function endGame() {
+      gameRunning = false;
+      overlayTitle.textContent = 'Game Over';
+      overlayMessage.textContent = `Score: ${score}`;
+      startBtn.textContent = 'Play Again';
+      overlay.classList.add('visible');
+    }
+
+    function gameLoop(timestamp) {
+      if (!gameRunning) return;
+
+      const width = canvas.offsetWidth;
+      const height = canvas.offsetHeight;
+
+      // Clear
+      ctx.fillStyle = '#0c0a09';
+      ctx.fillRect(0, 0, width, height);
+
+      // Spawn obstacles
+      if (timestamp - lastObstacleTime > 800) {
+        obstacles.push({
+          x: Math.random() * (width - 30),
+          y: -30,
+          width: 30,
+          height: 30,
+          speed: 2 + Math.random() * 2
+        });
+        lastObstacleTime = timestamp;
+      }
+
+      // Update and draw obstacles
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        const obs = obstacles[i];
+        obs.y += obs.speed;
+
+        // Draw obstacle
+        ctx.fillStyle = '#f472b6';
+        ctx.beginPath();
+        ctx.roundRect(obs.x, obs.y, obs.width, obs.height, 4);
+        ctx.fill();
+
+        // Check collision
+        if (
+          player.x < obs.x + obs.width &&
+          player.x + player.width > obs.x &&
+          player.y < obs.y + obs.height &&
+          player.y + player.height > obs.y
+        ) {
+          endGame();
+          return;
+        }
+
+        // Remove if off screen and add score
+        if (obs.y > height) {
+          obstacles.splice(i, 1);
+          score++;
+          scoreDisplay.textContent = score;
+        }
+      }
+
+      // Draw player
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath();
+      ctx.roundRect(player.x, player.y, player.width, player.height, 6);
+      ctx.fill();
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    // Controls
+    const moveSpeed = 8;
+
+    document.addEventListener('keydown', (e) => {
+      if (!gameRunning) return;
+      const width = canvas.offsetWidth;
+
+      if (e.key === 'ArrowLeft') {
+        player.x = Math.max(0, player.x - moveSpeed);
+      } else if (e.key === 'ArrowRight') {
+        player.x = Math.min(width - player.width, player.x + moveSpeed);
+      }
+    });
+
+    // Touch controls
+    canvas.addEventListener('click', (e) => {
+      if (!gameRunning) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const width = canvas.offsetWidth;
+
+      if (x < width / 2) {
+        player.x = Math.max(0, player.x - moveSpeed * 3);
+      } else {
+        player.x = Math.min(width - player.width, player.x + moveSpeed * 3);
+      }
+    });
+
+    startBtn.addEventListener('click', startGame);
+
+    // Initial draw
+    ctx.fillStyle = '#0c0a09';
+    ctx.fillRect(0, 0, canvas.offsetWidth, canvas.offsetHeight);
+    ctx.fillStyle = '#f59e0b';
+    ctx.beginPath();
+    ctx.roundRect(player.x, player.y, player.width, player.height, 6);
+    ctx.fill();
   </script>
 </body>
 </html>

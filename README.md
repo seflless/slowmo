@@ -1,21 +1,26 @@
 # slowmo
 
-Slow down or speed up time, to debug or study web animations.
+Slow down or speed up time on any web page.
 
 <!-- TODO: Add hero GIF/video here -->
 <!-- ![slowmo demo](./assets/demo.gif) -->
 
 ## Why?
 
+This is a utility package for making easy to use tools to:
+
 - **Debug animations** - Slow things down to see exactly what's happening
-- **Record demos** - Capture smooth slow-motion footage for product videos
-- **Create effects** - Add dramatic slow-mo moments to your UI
+- **Learn from others** - Appreciate the little details on why something looks so neat
+- **Speed run** - Skip or skim quickly through any animation gated experience
+- **Make games easier or harder** - Slower gives you better reflex, and faster challenges you more.
 
 ## Install
 
 ```bash
 npm install slowmo
 ```
+
+> **Chrome Extension coming soon** - Control any website's animations without writing code.
 
 ## Quick Start
 
@@ -82,8 +87,12 @@ Add `data-slowmo-exclude` to opt out specific elements:
 ## Limitations
 
 - **Frame-based animations** that don't use timestamps can't be smoothly slowed (they increment by a fixed amount each frame regardless of time)
-- **Libraries that cache time references** before slowmo loads may not be affected
+- **Libraries that cache time function references** before slowmo loads may not be affected
 - **Video/audio** have browser-imposed limits (~0.0625x to 16x in Chrome)
+- **iframes** won't be affected unless slowmo is also loaded inside them
+- **Web Workers & Worklets** run in separate threads with their own timing APIs that can't be patched from the main thread (audio worklets, paint worklets, animation worklets)
+- **WebGL shaders** with custom time uniforms need manual integration
+- **Server-synced animations** that rely on server timestamps rather than local time
 
 ## License
 
