@@ -82,7 +82,9 @@ const trackedMedia = new WeakMap<HTMLMediaElement, TrackedMedia>();
 function getVirtualTime(realTime: number): number {
   if (isPaused) return pauseTime;
   const elapsed = realTime - lastRealTime;
-  return virtualTime + elapsed * currentSpeed;
+  // For infinity speed, jump time forward very quickly (1000x real time)
+  const effectiveSpeed = currentSpeed === Infinity ? 1000 : currentSpeed;
+  return virtualTime + elapsed * effectiveSpeed;
 }
 
 /**
@@ -105,6 +107,18 @@ function updateWebAnimations(): void {
     const effect = anim.effect as KeyframeEffect | null;
     if (effect?.target instanceof Element) {
       if (effect.target.closest('[data-slowmo-exclude]')) continue;
+    }
+
+    // Handle infinity speed - finish animations immediately
+    if (currentSpeed === Infinity) {
+      try {
+        anim.finish();
+      } catch {
+        // Some animations can't be finished (infinite iterations)
+        // Set to max browser-supported playback rate instead
+        anim.playbackRate = 16;
+      }
+      continue;
     }
 
     const tracked = trackedAnimations.get(anim);
@@ -153,6 +167,15 @@ function updateMediaElements(): void {
     if (el.closest('[data-slowmo-exclude]')) return;
     const media = el as HTMLMediaElement;
 
+    // Handle infinity speed - jump to end and pause
+    if (currentSpeed === Infinity) {
+      if (media.duration && isFinite(media.duration)) {
+        media.currentTime = media.duration;
+        media.pause();
+      }
+      return;
+    }
+
     let tracked = trackedMedia.get(media);
 
     if (!tracked) {
@@ -182,8 +205,8 @@ function updateMediaElements(): void {
         media.play();
       }
 
-      // Apply speed
-      const newApplied = tracked.original * currentSpeed;
+      // Apply speed - clamp to browser limits (typically 0.0625 to 16)
+      const newApplied = Math.min(16, Math.max(0.0625, tracked.original * currentSpeed));
       if (media.playbackRate !== newApplied) {
         media.playbackRate = newApplied;
         tracked.applied = newApplied;

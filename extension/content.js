@@ -30,7 +30,9 @@
   function getVirtualTime(realTime) {
     if (isPaused) return pauseTime;
     const elapsed = realTime - lastRealTime;
-    return virtualTime + elapsed * currentSpeed;
+    // For infinity speed, jump time forward very quickly (1000x real time)
+    const effectiveSpeed = currentSpeed === Infinity ? 1000 : currentSpeed;
+    return virtualTime + elapsed * effectiveSpeed;
   }
 
   function updateWebAnimations() {
@@ -41,6 +43,19 @@
       if (effect?.target instanceof Element) {
         if (effect.target.closest('[data-slowmo-exclude]')) continue;
       }
+
+      // Handle infinity speed - finish animations immediately
+      if (currentSpeed === Infinity) {
+        try {
+          anim.finish();
+        } catch {
+          // Some animations can't be finished (infinite iterations)
+          // Set to max browser-supported playback rate instead
+          anim.playbackRate = 16;
+        }
+        continue;
+      }
+
       const tracked = trackedAnimations.get(anim);
       if (!tracked) {
         const original = anim.playbackRate;
@@ -70,6 +85,16 @@
     mediaElements.forEach((el) => {
       if (el.closest('[data-slowmo-exclude]')) return;
       const media = el;
+
+      // Handle infinity speed - jump to end and pause
+      if (currentSpeed === Infinity) {
+        if (media.duration && isFinite(media.duration)) {
+          media.currentTime = media.duration;
+          media.pause();
+        }
+        return;
+      }
+
       let tracked = trackedMedia.get(media);
       if (!tracked) {
         tracked = {
@@ -93,7 +118,8 @@
           tracked.wasPaused = false;
           media.play();
         }
-        const newApplied = tracked.original * currentSpeed;
+        // Clamp to browser limits (typically 0.0625 to 16)
+        const newApplied = Math.min(16, Math.max(0.0625, tracked.original * currentSpeed));
         if (media.playbackRate !== newApplied) {
           media.playbackRate = newApplied;
           tracked.applied = newApplied;
@@ -155,45 +181,6 @@
     }
   }
 
-  /**
-   * Skip all animations - instantly complete them
-   */
-  function skipAnimations() {
-    if (!isInstalled) install();
-
-    // Finish all Web Animations
-    if (typeof document.getAnimations === 'function') {
-      const animations = document.getAnimations();
-      for (const anim of animations) {
-        const effect = anim.effect;
-        if (effect?.target instanceof Element) {
-          if (effect.target.closest('[data-slowmo-exclude]')) continue;
-        }
-        try {
-          anim.finish();
-        } catch (e) {
-          // Some animations can't be finished (infinite, etc)
-          try {
-            anim.cancel();
-          } catch (e2) {}
-        }
-      }
-    }
-
-    // Seek all media to end
-    const mediaElements = document.querySelectorAll('video, audio');
-    mediaElements.forEach((el) => {
-      if (el.closest('[data-slowmo-exclude]')) return;
-      const media = el;
-      if (media.duration && isFinite(media.duration)) {
-        media.currentTime = media.duration;
-      }
-    });
-
-    // Jump virtual time forward significantly for rAF-based animations
-    virtualTime += 100000; // Jump 100 seconds forward
-  }
-
   // Initialize
   install();
 
@@ -217,7 +204,8 @@
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const state = JSON.parse(saved);
-        uiSpeed = state.speed ?? 1;
+        // Handle 'Infinity' string from JSON
+        uiSpeed = state.speed === 'Infinity' ? Infinity : (state.speed ?? 1);
         uiPaused = state.paused ?? false;
         isExpanded = state.expanded ?? false;
         setSpeed(uiPaused ? 0 : uiSpeed);
@@ -228,7 +216,8 @@
   function saveState() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        speed: uiSpeed,
+        // Store Infinity as string since JSON doesn't support it
+        speed: uiSpeed === Infinity ? 'Infinity' : uiSpeed,
         paused: uiPaused,
         expanded: isExpanded
       }));
@@ -329,14 +318,23 @@
 
       .slowmo-ext-badge {
         position: absolute;
-        top: 4px;
-        right: 4px;
-        font-size: 9px;
+        top: -4px;
+        right: -4px;
+        font-size: 11px;
         font-weight: 600;
-        color: var(--text-muted);
-        background: var(--bg-hover);
-        padding: 2px 4px;
-        border-radius: 4px;
+        color: var(--accent);
+        background: var(--bg);
+        border: 1px solid var(--border);
+        padding: 2px 6px;
+        border-radius: 6px;
+        min-width: 20px;
+        text-align: center;
+      }
+
+      .slowmo-ext-badge.modified {
+        background: var(--accent);
+        color: #000;
+        border-color: var(--accent);
       }
 
       /* Expanded state */
@@ -428,7 +426,7 @@
         border-radius: 100px;
         cursor: pointer;
         font-family: ui-monospace, 'SF Mono', Monaco, monospace;
-        font-size: 12px;
+        font-size: 14px;
         color: var(--text-dim);
         transition: all 0.15s;
         white-space: nowrap;
@@ -496,7 +494,7 @@
             <circle cx="12" cy="12" r="10"></circle>
             <polyline points="12 6 12 12 16 14"></polyline>
           </svg>
-          <span class="slowmo-ext-badge">${formatSpeed(uiSpeed)}</span>
+          <span class="slowmo-ext-badge ${uiSpeed !== 1 || uiPaused ? 'modified' : ''}">${uiPaused ? '⏸' : formatSpeed(uiSpeed)}</span>
         </div>
         <div class="slowmo-ext-expanded">
           <div class="slowmo-ext-header">
@@ -516,9 +514,9 @@
           </div>
           <div class="slowmo-ext-controls">
             <div class="slowmo-ext-presets slowmo-ext-slow">
-              <button class="slowmo-ext-preset ${uiSpeed === 0.1 && !uiPaused ? 'active' : ''}" data-speed="0.1">.1x</button>
-              <button class="slowmo-ext-preset ${uiSpeed === 0.25 && !uiPaused ? 'active' : ''}" data-speed="0.25">.25x</button>
-              <button class="slowmo-ext-preset ${uiSpeed === 0.5 && !uiPaused ? 'active' : ''}" data-speed="0.5">.5x</button>
+              <button class="slowmo-ext-preset ${uiSpeed === 0.1 && !uiPaused ? 'active' : ''}" data-speed="0.1">⅒</button>
+              <button class="slowmo-ext-preset ${uiSpeed === 0.25 && !uiPaused ? 'active' : ''}" data-speed="0.25">¼</button>
+              <button class="slowmo-ext-preset ${uiSpeed === 0.5 && !uiPaused ? 'active' : ''}" data-speed="0.5">½</button>
             </div>
             <button class="slowmo-ext-playpause" data-action="playpause" title="${uiPaused ? 'Play' : 'Pause'}">
               <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor" style="display:${uiPaused ? 'block' : 'none'}">
@@ -530,9 +528,9 @@
               </svg>
             </button>
             <div class="slowmo-ext-presets slowmo-ext-fast">
-              <button class="slowmo-ext-preset ${uiSpeed === 1 && !uiPaused ? 'active' : ''}" data-speed="1">1x</button>
-              <button class="slowmo-ext-preset ${uiSpeed === 2 && !uiPaused ? 'active' : ''}" data-speed="2">2x</button>
-              <button class="slowmo-ext-preset skip" data-action="skip" title="Skip all animations">∞</button>
+              <button class="slowmo-ext-preset ${uiSpeed === 1 && !uiPaused ? 'active' : ''}" data-speed="1">1×</button>
+              <button class="slowmo-ext-preset ${uiSpeed === 2 && !uiPaused ? 'active' : ''}" data-speed="2">2×</button>
+              <button class="slowmo-ext-preset ${uiSpeed === Infinity && !uiPaused ? 'active' : ''}" data-speed="Infinity" title="Maximum speed">∞</button>
             </div>
           </div>
         </div>
@@ -547,7 +545,6 @@
     const header = root.querySelector('.slowmo-ext-header');
     const closeBtn = root.querySelector('.slowmo-ext-close');
     const playpauseBtn = root.querySelector('[data-action="playpause"]');
-    const skipBtn = root.querySelector('[data-action="skip"]');
     const presetBtns = root.querySelectorAll('.slowmo-ext-preset[data-speed]');
     const speedBadge = root.querySelector('.slowmo-ext-badge');
 
@@ -574,22 +571,10 @@
       saveState();
     });
 
-    // Skip
-    skipBtn.addEventListener('click', () => {
-      skipAnimations();
-      // Flash the button to indicate action
-      skipBtn.style.background = 'var(--accent)';
-      skipBtn.style.color = '#000';
-      setTimeout(() => {
-        skipBtn.style.background = '';
-        skipBtn.style.color = '';
-      }, 200);
-    });
-
-    // Speed presets
+    // Speed presets (including infinity)
     presetBtns.forEach(btn => {
       btn.addEventListener('click', () => {
-        uiSpeed = parseFloat(btn.dataset.speed);
+        uiSpeed = btn.dataset.speed === 'Infinity' ? Infinity : parseFloat(btn.dataset.speed);
         uiPaused = false;
         setSpeed(uiSpeed);
         updateUI();
@@ -642,12 +627,13 @@
       pauseIcon.style.display = uiPaused ? 'none' : 'block';
       playpauseBtn.title = uiPaused ? 'Play' : 'Pause';
 
-      // Speed badge
-      speedBadge.textContent = uiPaused ? '||' : formatSpeed(uiSpeed);
+      // Speed badge - highlight when not at normal speed
+      speedBadge.textContent = uiPaused ? '⏸' : formatSpeed(uiSpeed);
+      speedBadge.classList.toggle('modified', uiSpeed !== 1 || uiPaused);
 
-      // Preset buttons
+      // Preset buttons (including infinity)
       presetBtns.forEach(btn => {
-        const speed = parseFloat(btn.dataset.speed);
+        const speed = btn.dataset.speed === 'Infinity' ? Infinity : parseFloat(btn.dataset.speed);
         btn.classList.toggle('active', speed === uiSpeed && !uiPaused);
       });
     }
@@ -656,8 +642,25 @@
   }
 
   function formatSpeed(speed) {
-    if (speed < 1) return speed.toFixed(2).replace('0.', '.') + 'x';
-    return speed.toFixed(0) + 'x';
+    // Handle infinity
+    if (speed === Infinity) return '∞'
+
+    // Use fractions for common speeds
+    const fractions = {
+      0.1: '⅒',
+      0.125: '⅛',
+      0.25: '¼',
+      0.333: '⅓',
+      0.5: '½',
+      0.666: '⅔',
+      0.75: '¾'
+    }
+    // Check for close matches (floating point tolerance)
+    for (const [val, frac] of Object.entries(fractions)) {
+      if (Math.abs(speed - parseFloat(val)) < 0.01) return frac
+    }
+    if (speed >= 1) return speed.toFixed(0) + '×'
+    return speed.toFixed(2).replace('0.', '.') + '×'
   }
 
   // ============================================
