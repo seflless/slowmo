@@ -51,3 +51,40 @@ This would be opt-in and clearly documented as a different mode with different t
 ### Recording Helper
 - Integration with screen recording
 - Automatically slow down, record, then speed up the video in post
+
+## Animation Recreation (Implemented)
+
+AI-powered animation analysis and code generation. Feed a video/GIF and get code back.
+
+**Current features:**
+- Multi-backend support (Gemini, OpenAI, Anthropic)
+- 10 runtime targets (CSS, Framer Motion, GSAP, Remotion, etc.)
+- CLI tool for easy video-to-code workflow
+- Frame extraction from video/images
+- Baked-in runtime presets with best practices
+
+**Future enhancements:**
+
+### Animation Eval/Benchmark
+- Build an eval suite to compare AI backends on animation recreation
+- Test cases: entrance animations, physics, morphing, particles, etc.
+- Score on: accuracy, code quality, runtime compatibility
+
+### Browser Recording Integration
+- Use slowmo to record animations in slow-mo
+- Auto-extract frames for better AI analysis
+- One-click workflow: play -> record -> analyze -> recreate
+
+### Interactive Refinement
+- Chat-based refinement of generated code
+- "Make it bouncier", "Add more delay", etc.
+- Preview generated animation side-by-side with original
+
+### Animation Library Detection
+- Auto-detect what library created the original animation
+- Generate code in the same library for easier integration
+
+### Export to More Formats
+- After Effects expressions
+- Motion Design tokens (design system integration)
+- Rive runtime format
