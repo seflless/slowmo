@@ -11,13 +11,16 @@ export default defineConfig({
   ],
   build: {
     lib: {
-      entry: resolve(__dirname, 'src/index.ts'),
+      entry: {
+        slowmo: resolve(__dirname, 'src/index.ts'),
+        recreate: resolve(__dirname, 'src/recreate.ts'),
+        'cli/recreate': resolve(__dirname, 'src/cli/recreate.ts'),
+      },
       name: 'slowmo',
-      fileName: 'slowmo',
-      formats: ['es', 'cjs', 'umd'],
+      formats: ['es', 'cjs'],
     },
     rollupOptions: {
-      external: ['gsap'],
+      external: ['gsap', 'fs', 'path'],
       output: {
         globals: {
           gsap: 'gsap',

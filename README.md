@@ -66,6 +66,61 @@ Add `data-slowmo-exclude` to opt out specific elements:
 | Framer Motion         | Uses Web Animations API, works automatically |
 | Canvas animations     | Uses rAF, works automatically                |
 
+## Animation Recreation (AI-Powered)
+
+slowmo includes an AI-powered animation recreation skill that can analyze videos/GIFs and generate code to recreate them.
+
+### CLI Usage
+
+```bash
+# Install globally or use npx
+npx slowmo-recreate ./animation.mp4 --runtime framer-motion --api-key $GEMINI_API_KEY
+
+# Generate GSAP code
+npx slowmo-recreate ./demo.gif -r gsap -o animation.js
+
+# Analyze only (no code generation)
+npx slowmo-recreate ./video.mp4 -a --format json
+```
+
+### Programmatic Usage
+
+```js
+import { recreate } from "slowmo/recreate"
+
+const result = await recreate({
+  source: "./animation.mp4",
+  runtime: "framer-motion", // or 'gsap', 'css', 'remotion', etc.
+  apiKey: process.env.GEMINI_API_KEY,
+})
+
+console.log(result.code.code) // Generated animation code
+console.log(result.analysis) // AI analysis of the animation
+```
+
+### Supported Runtimes
+
+| Runtime        | Description                         |
+| -------------- | ----------------------------------- |
+| `css`          | Native CSS @keyframes               |
+| `framer-motion`| React animation library             |
+| `gsap`         | Professional-grade animation        |
+| `remotion`     | React video framework               |
+| `motion-one`   | Lightweight animation library       |
+| `anime`        | Anime.js                            |
+| `three`        | Three.js 3D animations              |
+| `lottie`       | JSON animation format               |
+| `react-spring` | Spring-physics React animations     |
+| `popmotion`    | Functional animation library        |
+
+### AI Backends
+
+- **Gemini** (default) - Best for video understanding
+- **OpenAI** - GPT-4 Vision
+- **Anthropic** - Claude
+
+Set your API key via environment variable (`GEMINI_API_KEY`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY`) or pass it directly.
+
 ## Limitations
 
 - **Frame-based animations** that don't use timestamps can't be smoothly slowed (they increment by a fixed amount each frame regardless of time)

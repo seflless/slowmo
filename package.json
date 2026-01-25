@@ -11,7 +11,15 @@
       "import": "./dist/slowmo.js",
       "require": "./dist/slowmo.cjs",
       "types": "./dist/index.d.ts"
+    },
+    "./recreate": {
+      "import": "./dist/recreate.js",
+      "require": "./dist/recreate.cjs",
+      "types": "./dist/recreate.d.ts"
     }
+  },
+  "bin": {
+    "slowmo-recreate": "./dist/cli/recreate.js"
   },
   "files": [
     "dist",
