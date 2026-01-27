@@ -80,6 +80,36 @@ export interface FrameExtractionOptions {
 }
 
 /**
+ * UI element detected in the animation
+ */
+export interface UIElement {
+  /** Type of UI element */
+  type: 'button' | 'card' | 'panel' | 'input' | 'modal' | 'menu' | 'icon' | 'text' | 'image' | 'container' | 'other';
+  /** Role in the animation */
+  role: 'trigger' | 'animated' | 'container' | 'static';
+  /** Description of the element */
+  description: string;
+  /** CSS-like properties (background, border, etc.) */
+  styles?: Record<string, string>;
+  /** Text content if visible */
+  text?: string;
+}
+
+/**
+ * User interaction detected in the video
+ */
+export interface UserInteraction {
+  /** Type of interaction */
+  type: 'click' | 'hover' | 'scroll' | 'drag' | 'keypress' | 'focus';
+  /** When in the video (normalized 0-1) */
+  timestamp: number;
+  /** What element was interacted with */
+  target: string;
+  /** Description of what happened */
+  description: string;
+}
+
+/**
  * Animation analysis result from AI
  */
 export interface AnimationAnalysis {
@@ -99,6 +129,12 @@ export interface AnimationAnalysis {
   style: AnimationStyle;
   /** Confidence score (0-1) */
   confidence: number;
+  /** UI elements detected in the recording */
+  uiElements?: UIElement[];
+  /** User interactions visible in the recording */
+  interactions?: UserInteraction[];
+  /** Whether this is an interactive component (vs pure animation) */
+  isInteractive?: boolean;
   /** Raw AI response for debugging */
   rawResponse?: string;
 }
@@ -135,8 +171,12 @@ export type AnimationStyle =
  * Code generation result
  */
 export interface GeneratedCode {
-  /** The generated animation code */
+  /** The generated animation code (CSS for interactive, full code otherwise) */
   code: string;
+  /** HTML structure (for interactive components) */
+  html?: string;
+  /** JavaScript for interactivity */
+  javascript?: string;
   /** Runtime this code targets */
   runtime: AnimationRuntime;
   /** Language of the code */
@@ -147,6 +187,8 @@ export interface GeneratedCode {
   usage: string;
   /** Additional notes or warnings */
   notes?: string[];
+  /** Whether this is an interactive component */
+  isInteractive?: boolean;
 }
 
 /**
@@ -191,6 +233,15 @@ export interface RecreateResult {
     framesAnalyzed: number;
     backend: AIBackend;
     model: string;
+    timing: {
+      frameExtraction: number;
+      analysis: number;
+      codeGeneration: number;
+    };
+    sourceInfo?: {
+      sizeBytes: number;
+      mimeType?: string;
+    };
   };
 }
 
@@ -535,15 +586,27 @@ async function callGemini(request: AIRequest): Promise<AIResponse> {
 
   const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
 
-  // Add images
+  // Add images/video frames
   for (const image of request.images) {
-    const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
-    parts.push({
-      inlineData: {
-        mimeType: 'image/jpeg',
-        data: base64Data,
-      },
-    });
+    // Extract mimeType and base64 data from data URL
+    const dataUrlMatch = image.match(/^data:([^;]+);base64,(.+)$/);
+    if (dataUrlMatch) {
+      const [, mimeType, base64Data] = dataUrlMatch;
+      parts.push({
+        inlineData: {
+          mimeType,
+          data: base64Data,
+        },
+      });
+    } else {
+      // Assume raw base64 image data
+      parts.push({
+        inlineData: {
+          mimeType: 'image/jpeg',
+          data: image,
+        },
+      });
+    }
   }
 
   // Add text prompt
@@ -815,22 +878,27 @@ async function prepareFrames(
 function buildAnalysisPrompt(runtime: AnimationRuntime, context?: string): string {
   const preset = RUNTIME_PRESETS[runtime];
 
-  return `You are an expert animation analyst and ${preset.name} developer.
+  return `You are an expert animation analyst, UI/UX designer, and ${preset.name} developer.
 
-Analyze the provided animation frames and reverse-engineer the animation to recreate it.
+Analyze the provided frames from a screen recording and reverse-engineer BOTH the animation AND the UI context it exists within.
 
 ## Your Task:
-1. Describe what's happening in the animation (motion, timing, elements)
-2. Identify the animation properties being animated (transform, opacity, scale, position, etc.)
-3. Estimate the duration, easing curve, and keyframes
-4. Detect any colors used
-5. Classify the animation style
+1. **UI Context Analysis**: Identify ALL visible UI elements (buttons, cards, panels, inputs, etc.)
+2. **Interaction Detection**: Look for user interactions - mouse cursor, clicks, hovers, typing
+3. **Animation Analysis**: What animates, how, and what triggers it
+4. **Visual Design**: Colors, spacing, border radius, shadows, typography
+
+## CRITICAL: This may be a SCREEN RECORDING of an interactive UI, not just an isolated animation.
+- Look for buttons, cards, panels, modals, menus
+- Look for mouse cursor movements and clicks
+- Determine if animation is triggered by user action
+- If you see a UI with interaction, set isInteractive: true
 
 ## Output Format:
-Respond with a JSON object containing:
+Respond with a JSON object:
 \`\`\`json
 {
-  "description": "A clear description of the animation",
+  "description": "What the animation/interaction does",
   "duration": 0.5,
   "easing": "ease-out",
   "properties": [
@@ -843,13 +911,48 @@ Respond with a JSON object containing:
   ],
   "colors": ["#ffffff", "#000000"],
   "style": "entrance",
-  "confidence": 0.85
+  "confidence": 0.85,
+  "isInteractive": true,
+  "uiElements": [
+    {
+      "type": "button",
+      "role": "trigger",
+      "description": "Cyan button that triggers the animation",
+      "text": "Show",
+      "styles": { "background": "#22d3ee", "borderRadius": "8px", "padding": "8px 16px" }
+    },
+    {
+      "type": "card",
+      "role": "container",
+      "description": "Dark card containing the content",
+      "styles": { "background": "#171717", "borderRadius": "12px", "border": "1px solid #262626" }
+    },
+    {
+      "type": "panel",
+      "role": "animated",
+      "description": "Content panel that shows/hides",
+      "styles": { "background": "#1a1a1a" }
+    }
+  ],
+  "interactions": [
+    {
+      "type": "click",
+      "timestamp": 0.2,
+      "target": "button",
+      "description": "User clicks the Show button to reveal content"
+    }
+  ]
 }
 \`\`\`
 
 ${context ? `## Additional Context:\n${context}\n` : ''}
 
-Be precise with timing and values. If you're uncertain, lower the confidence score.`;
+## Important:
+- If you see a button/trigger, include it in uiElements with role: "trigger"
+- If you see mouse cursor/click, record it in interactions
+- Match colors EXACTLY from the recording (use color picker precision)
+- Include ALL visible UI elements, even static ones
+- Be precise with timing and values`;
 }
 
 function buildCodeGenerationPrompt(
@@ -863,7 +966,53 @@ function buildCodeGenerationPrompt(
 ): string {
   const preset = RUNTIME_PRESETS[runtime];
   const { style = 'production', typescript = true, customPrompt } = options;
+  const isInteractive = analysis.isInteractive || (analysis.uiElements && analysis.uiElements.length > 0);
 
+  // For interactive UI components, generate full HTML/CSS/JS
+  if (isInteractive && runtime === 'css') {
+    return `You are an expert frontend developer. Recreate this INTERACTIVE UI COMPONENT with its animation.
+
+## Analysis (includes UI elements and interactions):
+${JSON.stringify(analysis, null, 2)}
+
+## CRITICAL REQUIREMENTS:
+1. Generate COMPLETE HTML + CSS + JavaScript as SEPARATE fields
+2. Include ALL UI elements from the analysis (buttons, cards, panels, etc.)
+3. Make the component INTERACTIVE - respond to clicks/hovers as shown
+4. Match the visual design EXACTLY (colors, spacing, border radius, shadows)
+5. The animation should trigger on user interaction (not auto-play)
+
+## Code Style: ${style}
+
+## IMPORTANT OUTPUT FORMAT:
+You MUST respond with a JSON object containing THREE separate fields:
+- "code": CSS styles only (no <style> tags)
+- "html": HTML snippet only (no <!DOCTYPE>, no <html>, no <head>, no <body> tags - just the component markup)
+- "javascript": JavaScript code only (no <script> tags)
+
+DO NOT return a full HTML document. Return ONLY this JSON structure:
+
+\`\`\`json
+{
+  "code": ".container { background: #000; padding: 20px; }\\n.panel { ... }\\n.button { ... }\\n@keyframes slideIn { ... }",
+  "html": "<div class=\\"container\\">\\n  <div class=\\"panel\\"></div>\\n  <button class=\\"button\\">Show</button>\\n</div>",
+  "javascript": "const btn = document.querySelector('.button');\\nconst panel = document.querySelector('.panel');\\nbtn.addEventListener('click', () => { panel.classList.toggle('visible'); });",
+  "usage": "Add the HTML to your page, include the CSS, and run the JavaScript",
+  "notes": ["Click the button to toggle the panel visibility"]
+}
+\`\`\`
+
+## Design Requirements:
+- Match all colors from analysis.colors exactly
+- Include proper hover states for interactive elements
+- Use smooth transitions (not just keyframes) where appropriate
+- Make buttons look clickable with cursor: pointer
+- Add focus states for accessibility
+
+REMEMBER: Return JSON with separate code/html/javascript fields. NOT a full HTML document.`;
+  }
+
+  // Standard animation-only prompt
   return `You are an expert ${preset.name} developer. Generate code to recreate this animation.
 
 ## Animation Analysis:
@@ -928,6 +1077,7 @@ export async function recreate(options: RecreateOptions): Promise<RecreateResult
   } = options;
 
   const startTime = Date.now();
+  const timing = { frameExtraction: 0, analysis: 0, codeGeneration: 0 };
   const preset = RUNTIME_PRESETS[runtime];
   const aiCall = AI_BACKENDS[backend];
 
@@ -940,13 +1090,16 @@ export async function recreate(options: RecreateOptions): Promise<RecreateResult
   }
 
   // Step 1: Extract frames from source
+  const frameStartTime = Date.now();
   const frames = await prepareFrames(source, frameOptions);
+  timing.frameExtraction = Date.now() - frameStartTime;
 
   if (frames.length === 0) {
     throw new Error('No frames could be extracted from the source');
   }
 
   // Step 2: Analyze animation with AI
+  const analysisStartTime = Date.now();
   const analysisPrompt = buildAnalysisPrompt(runtime, context);
   const analysisResponse = await aiCall({
     images: frames,
@@ -965,8 +1118,10 @@ export async function recreate(options: RecreateOptions): Promise<RecreateResult
   } catch (e) {
     throw new Error(`Failed to parse animation analysis: ${e}`);
   }
+  timing.analysis = Date.now() - analysisStartTime;
 
   // Step 3: Generate code for target runtime
+  const codeGenStartTime = Date.now();
   const codePrompt = buildCodeGenerationPrompt(analysis, runtime, {
     style,
     typescript,
@@ -980,29 +1135,80 @@ export async function recreate(options: RecreateOptions): Promise<RecreateResult
   });
 
   // Parse code JSON from response
-  let codeResult: { code: string; usage: string; notes?: string[] };
+  let codeResult: { code: string; html?: string; javascript?: string; usage: string; notes?: string[] };
   try {
     const jsonMatch = codeResponse.content.match(/```json\n?([\s\S]*?)\n?```/);
     const jsonStr = jsonMatch ? jsonMatch[1] : codeResponse.content;
     codeResult = JSON.parse(jsonStr);
   } catch (e) {
-    // If JSON parsing fails, try to extract code directly
-    const codeMatch = codeResponse.content.match(/```(?:tsx?|jsx?|css|json)?\n?([\s\S]*?)\n?```/);
-    codeResult = {
-      code: codeMatch ? codeMatch[1] : codeResponse.content,
-      usage: 'See code above',
-      notes: ['Code extraction was not in expected format'],
-    };
+    // If JSON parsing fails, try to extract from various formats
+    const content = codeResponse.content;
+
+    // Check if it's a full HTML document
+    if (content.includes('<!DOCTYPE html>') || content.includes('<html')) {
+      // Extract CSS from <style> tags
+      const styleMatch = content.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+      const css = styleMatch ? styleMatch[1].trim() : '';
+
+      // Extract HTML from <body> tags (just the inner content)
+      const bodyMatch = content.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+      let html = '';
+      if (bodyMatch) {
+        // Remove script tags from body content
+        html = bodyMatch[1].replace(/<script[\s\S]*?<\/script>/gi, '').trim();
+      }
+
+      // Extract JavaScript from <script> tags
+      const scriptMatch = content.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+      const js = scriptMatch ? scriptMatch[1].trim() : '';
+
+      codeResult = {
+        code: css,
+        html: html || undefined,
+        javascript: js || undefined,
+        usage: 'Extracted from full HTML document',
+        notes: ['AI returned full HTML document - extracted CSS, HTML body, and JavaScript'],
+      };
+    } else {
+      // Try to extract code block directly
+      const codeMatch = content.match(/```(?:tsx?|jsx?|css|html)?\n?([\s\S]*?)\n?```/);
+      codeResult = {
+        code: codeMatch ? codeMatch[1] : content,
+        usage: 'See code above',
+        notes: ['Code extraction was not in expected format'],
+      };
+    }
   }
+
+  timing.codeGeneration = Date.now() - codeGenStartTime;
+
+  const isInteractive = analysis.isInteractive || (analysis.uiElements && analysis.uiElements.length > 0);
 
   const generatedCode: GeneratedCode = {
     code: codeResult.code,
+    html: codeResult.html,
+    javascript: codeResult.javascript,
     runtime,
     language: preset.language,
     dependencies: preset.dependencies,
     usage: codeResult.usage,
     notes: codeResult.notes,
+    isInteractive,
   };
+
+  // Calculate source info from first frame if available
+  let sourceInfo: { sizeBytes: number; mimeType?: string } | undefined;
+  if (frames.length > 0 && typeof frames[0] === 'string') {
+    const firstFrame = frames[0];
+    const mimeMatch = firstFrame.match(/^data:([^;]+);base64,/);
+    if (mimeMatch) {
+      const base64Data = firstFrame.replace(/^data:[^;]+;base64,/, '');
+      sourceInfo = {
+        sizeBytes: Math.round((base64Data.length * 3) / 4), // Approximate decoded size
+        mimeType: mimeMatch[1],
+      };
+    }
+  }
 
   return {
     analysis,
@@ -1013,6 +1219,8 @@ export async function recreate(options: RecreateOptions): Promise<RecreateResult
       framesAnalyzed: frames.length,
       backend,
       model: analysisResponse.model,
+      timing,
+      sourceInfo,
     },
   };
 }

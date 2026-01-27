@@ -19,13 +19,14 @@
     }
   },
   "bin": {
-    "slowmo-recreate": "./dist/cli/recreate.js"
+    "slowmo": "./dist/cli/index.js"
   },
   "files": [
     "dist",
     "README.md"
   ],
   "scripts": {
+    "slowmo": "bun src/cli/index.ts",
     "dev": "vite demo",
     "build": "vite build",
     "build:demo": "vite build --config vite.demo.config.ts",
