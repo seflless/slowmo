@@ -1,0 +1,31 @@
+package.json
+  e0ace1c21f0e58a8 22,29
+src/cli/index.ts
+  e0ace1c21f0e58a8 1-72
+src/cli/recreate.ts
+  e0ace1c21f0e58a8 2,4,17-18,44-45,47,63-64,66,113-120,129-132,208-210,215-217,242-243,258,267,274-392,431-904,909,931,947-950,952-974,976,983-986,989,1012-1026,1032,1035-1038,1045-1056,1076,1082-1103
+docs/RECREATE_SPEC.md
+  e0ace1c21f0e58a8 1-165
+src/recreate.ts
+  e0ace1c21f0e58a8 83-111,132-137,174,176-179,190-191,236-244,589,591-602,606,609,881,883,886-889,891-895,901,914-944,950-955,969,971-1015,1080,1093,1095,1102,1121,1124,1138,1144-1180,1183-1186,1189-1190,1196,1199-1211,1222-1223
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.37",
+  "base_commit_sha": "eec95db9e45881b04e8d3acaf5b03c212715da85",
+  "prompts": {
+    "e0ace1c21f0e58a8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5f7d8fc4-8cac-4946-8095-0165326e9305",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Francois Laberge <francoislaberge@gmail.com>",
+      "messages": [],
+      "total_additions": 1463,
+      "total_deletions": 323,
+      "accepted_lines": 1187,
+      "overriden_lines": 0
+    }
+  }
+}
