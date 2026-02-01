@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Nested iframe - no slowmo</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        background: #1a1a1a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        gap: 15px;
+        padding: 10px;
+      }
+      .content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+      }
+      .spinner {
+        width: 30px;
+        height: 30px;
+        border-radius: 6px;
+        background: linear-gradient(135deg, #a78bfa, #8b5cf6);
+        animation: spin 2s linear infinite;
+      }
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      .label {
+        color: #888;
+        font-family: system-ui, sans-serif;
+        font-size: 9px;
+        text-align: center;
+      }
+      iframe {
+        width: 100px;
+        height: 90px;
+        border: 1px solid #333;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="content">
+      <div class="spinner"></div>
+      <div class="label">Middle<br>iframe</div>
+    </div>
+
+    <div class="content">
+      <iframe src="./plain-iframe-inner.html"></iframe>
+      <div class="label">Inner iframe<br>(3 levels)</div>
+    </div>
+
+    <script>
+      // NO slowmo loaded!
+      // Extension should inject via all_frames: true
+    </script>
+  </body>
+</html>

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Inner iframe - no slowmo</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        background: #222;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+      }
+      .spinner {
+        width: 20px;
+        height: 20px;
+        border-radius: 4px;
+        background: linear-gradient(135deg, #22c55e, #10b981);
+        animation: spin 2s linear infinite;
+      }
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="spinner"></div>
+
+    <script>
+      // NO slowmo loaded!
+      // Extension should inject via all_frames: true
+      // This is 3 levels deep: parent -> nested -> inner
+    </script>
+  </body>
+</html>

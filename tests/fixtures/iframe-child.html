@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>iframe Child</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        background: #1a1a1a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        gap: 20px;
+      }
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #fbbf24, #f59e0b);
+        animation: spin 2s linear infinite;
+      }
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      .status {
+        color: #888;
+        font-family: system-ui, sans-serif;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="spinner" id="spinner"></div>
+    <div class="status" id="status">Speed: 1x</div>
+
+    <script type="module">
+      import { slowmo } from '../../src/index.ts';
+
+      // Expose slowmo for this iframe
+      window.slowmo = slowmo;
+
+      // Listen for speed sync messages from parent
+      window.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'slowmo-sync') {
+          const speed = event.data.speed;
+          slowmo(speed);
+          document.getElementById('status').textContent = `Speed: ${speed}x`;
+        }
+      });
+
+      // Expose helper for tests
+      window.getAnimationPlaybackRate = function() {
+        const anims = document.getAnimations();
+        if (anims.length > 0) {
+          return anims[0].playbackRate;
+        }
+        return null;
+      };
+    </script>
+  </body>
+</html>

@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "description": "Control time on any web page. Slow down or speed up animations, videos, and games.",
   "permissions": ["activeTab", "scripting"],
+  "host_permissions": ["<all_urls>"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

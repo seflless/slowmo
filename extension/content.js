@@ -749,6 +749,44 @@
   }
 
   // ============================================
+  // EXPOSE GLOBAL API
+  // ============================================
+
+  // Expose slowmo function globally for programmatic control
+  // This allows pages and tests to call window.slowmo(0.5)
+  window.slowmo = function(speed) {
+    if (isTopFrame) {
+      uiSpeed = speed;
+      uiPaused = speed === 0;
+      setSpeed(speed);
+      saveState();
+      updateUI();
+    } else {
+      setSpeed(speed);
+    }
+  };
+
+  // Also expose helper methods
+  window.slowmo.getSpeed = function() {
+    return isTopFrame ? uiSpeed : currentSpeed;
+  };
+
+  window.slowmo.pause = function() {
+    window.slowmo(0);
+  };
+
+  window.slowmo.play = function() {
+    if (isTopFrame) {
+      uiPaused = false;
+      setSpeed(uiSpeed || 1);
+      saveState();
+      updateUI();
+    } else {
+      setSpeed(currentSpeed || 1);
+    }
+  };
+
+  // ============================================
   // INITIALIZE
   // ============================================
 

@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nested iframe</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        background: #1a1a1a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        gap: 15px;
+        padding: 10px;
+      }
+      .content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+      .spinner {
+        width: 35px;
+        height: 35px;
+        border-radius: 6px;
+        background: linear-gradient(135deg, #a78bfa, #8b5cf6);
+        animation: spin 2s linear infinite;
+      }
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      .label {
+        color: #888;
+        font-family: system-ui, sans-serif;
+        font-size: 10px;
+      }
+      .rate {
+        color: #a78bfa;
+        font-family: monospace;
+        font-size: 10px;
+      }
+      iframe {
+        width: 120px;
+        height: 100px;
+        border: 1px solid #333;
+        border-radius: 6px;
+      }
+      .nested-label {
+        color: #666;
+        font-family: system-ui, sans-serif;
+        font-size: 9px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="content">
+      <div class="spinner" id="spinner"></div>
+      <div class="label">Middle iframe</div>
+      <div class="rate" id="rate">1x</div>
+    </div>
+
+    <div class="content">
+      <iframe id="inner-iframe" src="./iframe-child.html"></iframe>
+      <div class="nested-label">Inner iframe<br>(3 levels deep)</div>
+    </div>
+
+    <script type="module">
+      import { slowmo } from '../../src/index.ts';
+
+      window.slowmo = slowmo;
+
+      // Listen for speed sync from parent
+      window.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'slowmo-sync') {
+          const speed = event.data.speed;
+          slowmo(speed);
+          document.getElementById('rate').textContent = speed === 0 ? 'Paused' : `${speed}x`;
+
+          // Forward to nested iframe
+          const innerIframe = document.getElementById('inner-iframe');
+          if (innerIframe && innerIframe.contentWindow) {
+            innerIframe.contentWindow.postMessage({ type: 'slowmo-sync', speed }, '*');
+          }
+        }
+      });
+
+      // Expose helper
+      window.getAnimationPlaybackRate = function() {
+        const anims = document.getAnimations();
+        return anims.length > 0 ? anims[0].playbackRate : null;
+      };
+    </script>
+  </body>
+</html>

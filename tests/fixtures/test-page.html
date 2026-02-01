@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>slowmo Test Page</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: system-ui, sans-serif; background: #111; color: #fff; padding: 20px; }
+      .test-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; max-width: 800px; }
+      .test-box { background: #222; border-radius: 8px; padding: 20px; }
+      .test-box h3 { font-size: 14px; margin-bottom: 10px; color: #888; }
+      .visual { height: 100px; position: relative; background: #1a1a1a; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+      .anim-box { width: 40px; height: 40px; border-radius: 8px; }
+
+      /* CSS Animation - 2 second rotation */
+      .css-box { background: linear-gradient(135deg, #f472b6, #fb7185); animation: spin 2s linear infinite; }
+      @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+      /* rAF box */
+      .raf-box { background: linear-gradient(135deg, #38bdf8, #22d3ee); position: absolute; }
+
+      /* WAAPI box */
+      .waa-box { background: linear-gradient(135deg, #4ade80, #34d399); }
+
+      /* Excluded box */
+      .excluded-box { background: linear-gradient(135deg, #a78bfa, #8b5cf6); animation: spin 2s linear infinite; }
+
+      /* Video */
+      video { width: 100%; height: 100%; object-fit: cover; }
+
+      /* iframe */
+      iframe { width: 100%; height: 100px; border: none; background: #1a1a1a; }
+    </style>
+  </head>
+  <body>
+    <h1 style="margin-bottom: 20px;">slowmo Test Page</h1>
+
+    <div class="test-container">
+      <!-- CSS Animation -->
+      <div class="test-box" data-test="css">
+        <h3>CSS Animation (2s rotation)</h3>
+        <div class="visual">
+          <div class="anim-box css-box" id="css-box"></div>
+        </div>
+      </div>
+
+      <!-- requestAnimationFrame -->
+      <div class="test-box" data-test="raf">
+        <h3>requestAnimationFrame</h3>
+        <div class="visual" id="raf-container">
+          <div class="anim-box raf-box" id="raf-box"></div>
+        </div>
+      </div>
+
+      <!-- Web Animations API -->
+      <div class="test-box" data-test="waapi">
+        <h3>Web Animations API (1s bounce)</h3>
+        <div class="visual">
+          <div class="anim-box waa-box" id="waa-box"></div>
+        </div>
+      </div>
+
+      <!-- Video -->
+      <div class="test-box" data-test="video">
+        <h3>HTML5 Video</h3>
+        <div class="visual">
+          <video id="test-video" autoplay muted loop playsinline>
+            <source src="https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" type="video/mp4" />
+          </video>
+        </div>
+      </div>
+
+      <!-- Excluded element -->
+      <div class="test-box" data-test="excluded">
+        <h3>Excluded (data-slowmo-exclude)</h3>
+        <div class="visual">
+          <div class="anim-box excluded-box" id="excluded-box" data-slowmo-exclude></div>
+        </div>
+      </div>
+
+      <!-- Same-origin iframe -->
+      <div class="test-box" data-test="iframe">
+        <h3>Same-origin iframe</h3>
+        <iframe id="test-iframe" src="./iframe-child.html"></iframe>
+      </div>
+    </div>
+
+    <script type="module">
+      import { slowmo } from '../../src/index.ts';
+
+      // Expose slowmo globally for tests
+      window.slowmo = slowmo;
+
+      // requestAnimationFrame animation - sinusoidal movement
+      const rafBox = document.getElementById('raf-box');
+      const rafContainer = document.getElementById('raf-container');
+      let rafStartTime = null;
+      let lastRafTimestamp = 0;
+
+      function animateRAF(timestamp) {
+        if (!rafStartTime) rafStartTime = timestamp;
+        lastRafTimestamp = timestamp;
+
+        const elapsed = timestamp - rafStartTime;
+        const angle = elapsed * 0.001; // radians per ms
+        const containerWidth = rafContainer.offsetWidth;
+        const x = Math.sin(angle) * (containerWidth / 2 - 40);
+        rafBox.style.transform = `translateX(${x}px)`;
+
+        requestAnimationFrame(animateRAF);
+      }
+      requestAnimationFrame(animateRAF);
+
+      // Web Animations API - 1s bounce animation
+      const waaBox = document.getElementById('waa-box');
+      const waaAnimation = waaBox.animate(
+        [
+          { transform: 'translateY(0) scale(1)', offset: 0 },
+          { transform: 'translateY(-30px) scale(1.1)', offset: 0.5 },
+          { transform: 'translateY(0) scale(1)', offset: 1 },
+        ],
+        {
+          duration: 1000,
+          iterations: Infinity,
+          easing: 'ease-in-out',
+        }
+      );
+
+      // Test helpers exposed globally
+      window.testHelpers = {
+        // Get CSS animation progress (0-1) for spin animation
+        getCSSAnimationProgress(selector) {
+          const anims = document.getAnimations();
+          const anim = anims.find(a =>
+            a.effect &&
+            a.effect.target &&
+            a.effect.target.matches &&
+            a.effect.target.matches(selector)
+          );
+          if (!anim || !anim.effect) return null;
+          const timing = anim.effect.getComputedTiming();
+          return timing.progress;
+        },
+
+        // Get CSS animation playback rate
+        getCSSAnimationPlaybackRate(selector) {
+          const anims = document.getAnimations();
+          const anim = anims.find(a =>
+            a.effect &&
+            a.effect.target &&
+            a.effect.target.matches &&
+            a.effect.target.matches(selector)
+          );
+          return anim ? anim.playbackRate : null;
+        },
+
+        // Get WAAPI animation playback rate
+        getWAAPIPlaybackRate() {
+          return waaAnimation.playbackRate;
+        },
+
+        // Get WAAPI animation progress
+        getWAAPIProgress() {
+          const timing = waaAnimation.effect.getComputedTiming();
+          return timing.progress;
+        },
+
+        // Get WAAPI currentTime
+        getWAAPICurrentTime() {
+          return waaAnimation.currentTime;
+        },
+
+        // Get video playback rate
+        getVideoPlaybackRate() {
+          const video = document.getElementById('test-video');
+          return video.playbackRate;
+        },
+
+        // Get video current time
+        getVideoCurrentTime() {
+          const video = document.getElementById('test-video');
+          return video.currentTime;
+        },
+
+        // Get last rAF timestamp (for measuring virtual time)
+        getLastRAFTimestamp() {
+          return lastRafTimestamp;
+        },
+
+        // Reset rAF start time for timing tests
+        resetRAFStartTime() {
+          rafStartTime = null;
+        },
+
+        // Capture rAF timestamp delta over a period
+        async captureRAFDelta(durationMs) {
+          return new Promise(resolve => {
+            let firstTs = null;
+            let lastTs = null;
+            const start = performance.now();
+
+            function capture(ts) {
+              if (firstTs === null) firstTs = ts;
+              lastTs = ts;
+
+              // Use real performance.now for timing (original, not patched)
+              if (Date.now() - start < durationMs) {
+                requestAnimationFrame(capture);
+              } else {
+                resolve({
+                  virtualDelta: lastTs - firstTs,
+                  realDuration: durationMs
+                });
+              }
+            }
+            requestAnimationFrame(capture);
+          });
+        },
+
+        // Get all animations
+        getAllAnimations() {
+          return document.getAnimations();
+        },
+
+        // Broadcast speed to iframe
+        broadcastToIframe(speed) {
+          const iframe = document.getElementById('test-iframe');
+          if (iframe && iframe.contentWindow) {
+            iframe.contentWindow.postMessage({ type: 'slowmo-sync', speed }, '*');
+          }
+        },
+
+        // Get iframe animation playback rate
+        async getIframeAnimationPlaybackRate() {
+          const iframe = document.getElementById('test-iframe');
+          if (!iframe || !iframe.contentWindow) return null;
+          try {
+            const anims = iframe.contentWindow.document.getAnimations();
+            if (anims.length > 0) {
+              return anims[0].playbackRate;
+            }
+          } catch (e) {
+            return null; // Cross-origin
+          }
+          return null;
+        }
+      };
+    </script>
+  </body>
+</html>
