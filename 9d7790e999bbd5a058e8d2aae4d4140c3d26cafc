@@ -1,0 +1,23 @@
+specs/SPEC.md
+  6b7a2a165a6275a0 170-176
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.40",
+  "base_commit_sha": "9d7790e999bbd5a058e8d2aae4d4140c3d26cafc",
+  "prompts": {
+    "6b7a2a165a6275a0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d3b39305-032e-4f0c-9fac-37400d0a385e",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Francois Laberge <francoislaberge@gmail.com>",
+      "messages": [],
+      "total_additions": 7,
+      "total_deletions": 0,
+      "accepted_lines": 7,
+      "overriden_lines": 0
+    }
+  }
+}
