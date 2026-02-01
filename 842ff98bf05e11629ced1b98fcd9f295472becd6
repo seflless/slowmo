@@ -1,0 +1,106 @@
+tests/fixtures/plain-iframe.html
+  f076e52a32f67af3 1-46
+vite.test.config.ts
+  f076e52a32f67af3 1-12
+specs/SPEC.md
+  f076e52a32f67af3 73-169
+  6b7a2a165a6275a0 170-176
+  d14ab0da72882a06 1-72
+tests/unit/virtual-time.test.ts
+  f076e52a32f67af3 1-63
+tests/unit/api.test.ts
+  f076e52a32f67af3 1-131
+extension/content.js
+  f076e52a32f67af3 192-219,227,234,244-269,272-282,303,383-396,439-441,458,476,491,503,598-634
+tests/e2e/video-playback.spec.ts
+  f076e52a32f67af3 1-171
+tests/e2e/extension/extension.config.ts
+  f076e52a32f67af3 1-36
+tests/e2e/web-animations.spec.ts
+  f076e52a32f67af3 1-114
+tests/fixtures/iframe-demo.html
+  f076e52a32f67af3 1-226
+tests/fixtures/plain-iframe-inner.html
+  f076e52a32f67af3 1-37
+tests/unit/tracking.test.ts
+  f076e52a32f67af3 1-244
+tests/e2e/extension/iframe-sync.spec.ts
+  f076e52a32f67af3 1-318
+tests/fixtures/test-page.html
+  f076e52a32f67af3 1-251
+tests/e2e/playwright.config.ts
+  f076e52a32f67af3 1-31
+tests/fixtures/extension-test.html
+  f076e52a32f67af3 1-127
+vitest.config.ts
+  f076e52a32f67af3 1-12
+package.json
+  f076e52a32f67af3 34,36-39,68,70-71,75
+  d14ab0da72882a06 1-2,4-13,19-20,24,27-28,30-33,35,40,45-58,67,69,72-74,76-83,86
+tests/fixtures/iframe-test-page.html
+  f076e52a32f67af3 1-155
+tests/e2e/iframe-sync.spec.ts
+  f076e52a32f67af3 1-155
+tests/fixtures/plain-iframe-nested.html
+  f076e52a32f67af3 1-64
+tests/e2e/raf-animation.spec.ts
+  f076e52a32f67af3 1-134
+tests/fixtures/gsap-page.html
+  f076e52a32f67af3 1-67
+tests/e2e/gsap.spec.ts
+  f076e52a32f67af3 1-76
+extension/manifest.json
+  f076e52a32f67af3 7
+tests/e2e/css-animation.spec.ts
+  f076e52a32f67af3 1-91
+tests/fixtures/iframe-child.html
+  f076e52a32f67af3 1-64
+tests/fixtures/iframe-with-iframe.html
+  f076e52a32f67af3 1-98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.41",
+  "base_commit_sha": "842ff98bf05e11629ced1b98fcd9f295472becd6",
+  "prompts": {
+    "6b7a2a165a6275a0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d3b39305-032e-4f0c-9fac-37400d0a385e",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Francois Laberge <francoislaberge@gmail.com>",
+      "messages": [],
+      "total_additions": 7,
+      "total_deletions": 0,
+      "accepted_lines": 7,
+      "overriden_lines": 0
+    },
+    "d14ab0da72882a06": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d4dfba95-7d3f-48c8-ba81-6663cff492b7",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Francois Laberge <francoislaberge@gmail.com>",
+      "messages": [],
+      "total_additions": 1538,
+      "total_deletions": 53,
+      "accepted_lines": 123,
+      "overriden_lines": 0
+    },
+    "f076e52a32f67af3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c88da0fe-6cb1-4812-a281-2f6ae32cbdfd",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Francois Laberge <francoislaberge@gmail.com>",
+      "messages": [],
+      "total_additions": 3573,
+      "total_deletions": 610,
+      "accepted_lines": 2956,
+      "overriden_lines": 0
+    }
+  }
+}
