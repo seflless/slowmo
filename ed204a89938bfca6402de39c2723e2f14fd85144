@@ -1,0 +1,77 @@
+tests/unit/api.test.ts
+  f076e52a32f67af3 1-131
+tests/unit/virtual-time.test.ts
+  f076e52a32f67af3 1-63
+tests/fixtures/gsap-page.html
+  f076e52a32f67af3 1-67
+tests/e2e/gsap.spec.ts
+  f076e52a32f67af3 1-76
+vite.test.config.ts
+  f076e52a32f67af3 1-12
+extension/content.js
+  f076e52a32f67af3 752-788
+vitest.config.ts
+  f076e52a32f67af3 1-12
+tests/e2e/web-animations.spec.ts
+  f076e52a32f67af3 1-114
+tests/unit/tracking.test.ts
+  f076e52a32f67af3 1-244
+tests/e2e/css-animation.spec.ts
+  f076e52a32f67af3 1-91
+tests/e2e/extension/extension.config.ts
+  f076e52a32f67af3 1-36
+tests/e2e/raf-animation.spec.ts
+  f076e52a32f67af3 1-134
+tests/fixtures/plain-iframe-inner.html
+  f076e52a32f67af3 1-37
+tests/fixtures/iframe-demo.html
+  f076e52a32f67af3 1-226
+tests/e2e/extension/iframe-sync.spec.ts
+  f076e52a32f67af3 1-318
+specs/SPEC.md
+  f076e52a32f67af3 73-169
+tests/fixtures/iframe-test-page.html
+  f076e52a32f67af3 1-155
+tests/fixtures/plain-iframe.html
+  f076e52a32f67af3 1-46
+tests/fixtures/test-page.html
+  f076e52a32f67af3 1-251
+tests/e2e/iframe-sync.spec.ts
+  f076e52a32f67af3 1-155
+tests/fixtures/plain-iframe-nested.html
+  f076e52a32f67af3 1-64
+extension/manifest.json
+  f076e52a32f67af3 7
+package.json
+  f076e52a32f67af3 34,36-39,68,70-71,75
+tests/fixtures/extension-test.html
+  f076e52a32f67af3 1-127
+tests/e2e/playwright.config.ts
+  f076e52a32f67af3 1-31
+tests/e2e/video-playback.spec.ts
+  f076e52a32f67af3 1-171
+tests/fixtures/iframe-with-iframe.html
+  f076e52a32f67af3 1-98
+tests/fixtures/iframe-child.html
+  f076e52a32f67af3 1-64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.40",
+  "base_commit_sha": "ed204a89938bfca6402de39c2723e2f14fd85144",
+  "prompts": {
+    "f076e52a32f67af3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c88da0fe-6cb1-4812-a281-2f6ae32cbdfd",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Francois Laberge <francoislaberge@gmail.com>",
+      "messages": [],
+      "total_additions": 3573,
+      "total_deletions": 610,
+      "accepted_lines": 2966,
+      "overriden_lines": 0
+    }
+  }
+}
