@@ -1,0 +1,31 @@
+vite.config.ts
+  86fed2088a3705d9 16,24
+src/controller.ts
+  86fed2088a3705d9 1-469
+demo/index.html
+  86fed2088a3705d9 261-262,265-267,758,760,881,901-909
+src/index.ts
+  86fed2088a3705d9 402-404
+extension/content.js
+  86fed2088a3705d9 188,194-198,201-241,257,266,284-291,295,297-298,302,305-306,309-318,320-321,324,328-329,332,334-335,338-346,349-353,356-357,360-364,367-376,379-388,392-393,396-398,401-407,410-412,415-416,419-426,428,433-441,443-451,453-455,459,462-463,465,467-470,472-523,527,530-535,538-556,559-561,563-573,575-584,586-602,652,665,702
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.40",
+  "base_commit_sha": "b944aaab363ba57e8eee449e182284934cd7eb3d",
+  "prompts": {
+    "86fed2088a3705d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45fabeee-be90-4759-b228-61cdfc8a7746",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Francois Laberge <francoislaberge@gmail.com>",
+      "messages": [],
+      "total_additions": 820,
+      "total_deletions": 546,
+      "accepted_lines": 795,
+      "overriden_lines": 0
+    }
+  }
+}
