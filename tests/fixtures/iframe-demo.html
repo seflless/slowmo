@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>slowmo iframe Demo</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: system-ui, sans-serif;
+        background: #0c0a09;
+        color: #fff;
+        padding: 20px;
+        min-height: 100vh;
+      }
+      h1 { margin-bottom: 10px; color: #f59e0b; }
+      .subtitle { color: #888; margin-bottom: 20px; font-size: 14px; }
+
+      /* Speed Controls */
+      .controls {
+        background: #1c1917;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 30px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+      .controls label { color: #a8a29e; font-size: 14px; }
+      .speed-buttons {
+        display: flex;
+        gap: 8px;
+      }
+      .speed-btn {
+        padding: 8px 16px;
+        border: 1px solid #333;
+        border-radius: 6px;
+        background: #292524;
+        color: #fff;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.15s;
+      }
+      .speed-btn:hover { background: #3f3f46; }
+      .speed-btn.active { background: #f59e0b; color: #000; border-color: #f59e0b; }
+      .current-speed {
+        font-size: 24px;
+        font-weight: bold;
+        color: #f59e0b;
+        min-width: 80px;
+      }
+
+      /* Layout */
+      .demo-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+      .demo-section {
+        background: #1c1917;
+        border-radius: 12px;
+        padding: 20px;
+      }
+      .demo-section h2 {
+        font-size: 14px;
+        color: #888;
+        margin-bottom: 15px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      /* Animations */
+      .animation-row {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 15px;
+      }
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        animation: spin 2s linear infinite;
+      }
+      .spinner.pink { background: linear-gradient(135deg, #ec4899, #f43f5e); }
+      .spinner.blue { background: linear-gradient(135deg, #3b82f6, #6366f1); }
+      .spinner.green { background: linear-gradient(135deg, #22c55e, #10b981); }
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      .label { color: #a8a29e; font-size: 13px; }
+      .rate { color: #f59e0b; font-family: monospace; }
+
+      /* iframes */
+      iframe {
+        width: 100%;
+        height: 150px;
+        border: 1px solid #333;
+        border-radius: 8px;
+        background: #0c0a09;
+      }
+      .iframe-container { margin-top: 10px; }
+
+      .full-width {
+        grid-column: 1 / -1;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>slowmo iframe Demo</h1>
+    <p class="subtitle">Control speed from here - watch animations in parent AND iframes slow down together</p>
+
+    <!-- Speed Controls -->
+    <div class="controls">
+      <label>Speed:</label>
+      <div class="speed-buttons">
+        <button class="speed-btn" data-speed="0.1">0.1x</button>
+        <button class="speed-btn" data-speed="0.25">0.25x</button>
+        <button class="speed-btn" data-speed="0.5">0.5x</button>
+        <button class="speed-btn active" data-speed="1">1x</button>
+        <button class="speed-btn" data-speed="2">2x</button>
+        <button class="speed-btn" data-speed="0">⏸ Pause</button>
+      </div>
+      <div class="current-speed" id="current-speed">1x</div>
+    </div>
+
+    <div class="demo-grid">
+      <!-- Parent Frame Animation -->
+      <div class="demo-section">
+        <h2>Parent Frame</h2>
+        <div class="animation-row">
+          <div class="spinner pink" id="parent-spinner"></div>
+          <div>
+            <div class="label">CSS Animation</div>
+            <div class="rate" id="parent-rate">playbackRate: 1</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Same-origin iframe -->
+      <div class="demo-section">
+        <h2>iframe (same-origin)</h2>
+        <div class="iframe-container">
+          <iframe id="iframe1" src="./iframe-child.html"></iframe>
+        </div>
+      </div>
+
+      <!-- Another iframe -->
+      <div class="demo-section">
+        <h2>Second iframe</h2>
+        <div class="iframe-container">
+          <iframe id="iframe2" src="./iframe-child.html"></iframe>
+        </div>
+      </div>
+
+      <!-- Nested iframe -->
+      <div class="demo-section">
+        <h2>Nested iframe (iframe in iframe)</h2>
+        <div class="iframe-container">
+          <iframe id="iframe-nested" src="./iframe-with-iframe.html"></iframe>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { slowmo } from '../../src/index.ts';
+
+      // Expose globally
+      window.slowmo = slowmo;
+
+      let currentSpeed = 1;
+
+      // Update display
+      function updateDisplay() {
+        document.getElementById('current-speed').textContent =
+          currentSpeed === 0 ? 'Paused' : `${currentSpeed}x`;
+
+        const anims = document.getAnimations();
+        if (anims.length > 0) {
+          document.getElementById('parent-rate').textContent =
+            `playbackRate: ${anims[0].playbackRate}`;
+        }
+      }
+
+      // Broadcast to all iframes
+      function broadcastSpeed(speed) {
+        const iframes = document.querySelectorAll('iframe');
+        iframes.forEach(iframe => {
+          try {
+            iframe.contentWindow?.postMessage({ type: 'slowmo-sync', speed }, '*');
+          } catch (e) {}
+        });
+      }
+
+      // Set speed
+      function setSpeed(speed) {
+        currentSpeed = speed;
+        slowmo(speed);
+        broadcastSpeed(speed);
+        updateDisplay();
+
+        // Update button states
+        document.querySelectorAll('.speed-btn').forEach(btn => {
+          btn.classList.toggle('active', parseFloat(btn.dataset.speed) === speed);
+        });
+      }
+
+      // Button handlers
+      document.querySelectorAll('.speed-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          setSpeed(parseFloat(btn.dataset.speed));
+        });
+      });
+
+      // Initial sync after iframes load
+      window.addEventListener('load', () => {
+        setTimeout(() => broadcastSpeed(currentSpeed), 500);
+      });
+
+      // Update display periodically
+      setInterval(updateDisplay, 200);
+    </script>
+  </body>
+</html>

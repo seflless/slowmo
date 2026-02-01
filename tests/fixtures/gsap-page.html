@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GSAP Test Page</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: system-ui, sans-serif; background: #111; color: #fff; padding: 20px; }
+      .visual { height: 150px; position: relative; background: #1a1a1a; border-radius: 8px; overflow: hidden; margin-top: 20px; }
+      .gsap-box {
+        width: 50px;
+        height: 50px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #84cc16, #22c55e);
+        position: absolute;
+        top: 50%;
+        left: 20px;
+        transform: translateY(-50%);
+      }
+    </style>
+    <!-- Load GSAP from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  </head>
+  <body>
+    <h1>GSAP Test Page</h1>
+    <p id="status" style="color: #888; margin-top: 10px;">TimeScale: 1</p>
+
+    <div class="visual">
+      <div class="gsap-box" id="gsap-box"></div>
+    </div>
+
+    <script type="module">
+      import { slowmo } from '../../src/index.ts';
+
+      // Expose slowmo globally
+      window.slowmo = slowmo;
+
+      // Create a GSAP animation
+      const box = document.getElementById('gsap-box');
+      gsap.to(box, {
+        x: 300,
+        duration: 2,
+        repeat: -1,
+        yoyo: true,
+        ease: 'power1.inOut'
+      });
+
+      // Test helpers
+      window.testHelpers = {
+        getGSAPTimeScale() {
+          return gsap.globalTimeline.timeScale();
+        },
+
+        updateStatus() {
+          document.getElementById('status').textContent =
+            `TimeScale: ${gsap.globalTimeline.timeScale()}`;
+        }
+      };
+
+      // Update status when speed changes
+      setInterval(() => {
+        window.testHelpers.updateStatus();
+      }, 100);
+    </script>
+  </body>
+</html>

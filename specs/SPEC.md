@@ -70,3 +70,107 @@ The demo should showcase slowmo working with:
 7. Framer Motion spring animation
 
 Include a nice UI with a speed slider and preset buttons (0.1x, 0.25x, 0.5x, 1x, 2x).
+
+## Chrome Extension
+
+The Chrome extension provides page-wide control with full iframe support.
+
+### Extension Goals
+
+1. **Single top-level control** - One speed slider controls the entire page
+2. **All frames synchronized** - Same speed applied to main page and all iframes
+3. **Nested iframe support** - Works with iframes within iframes (any depth)
+4. **Cross-origin iframes** - CodeSandbox, StackBlitz, embedded demos all work
+5. **Dynamic iframes** - Newly added iframes automatically synchronized
+6. **All animation types** - Every animation type works in every iframe
+
+### How It Works
+
+| Mechanism | Purpose |
+|-----------|---------|
+| `all_frames: true` in manifest | Chrome auto-injects content script into ALL frames |
+| `broadcastToFrames()` | Parent sends postMessage to all child iframes on speed change |
+| Message listener | Each iframe listens, applies speed, forwards to nested iframes |
+| `MutationObserver` | Detects dynamically added iframes and syncs them |
+
+### Iframe Sync Protocol
+
+```js
+// Message format
+{
+  type: 'slowmo-extension-sync',
+  speed: 0.5,    // Current speed multiplier
+  paused: false  // Whether playback is paused
+}
+```
+
+### Test Scenarios
+
+The extension should pass these iframe tests:
+
+1. **Same-origin iframe** - Animations slow down correctly
+2. **Cross-origin iframe** - Animations slow down (via content script injection)
+3. **Nested iframes** - Parent → Child → Grandchild all synchronized
+4. **Dynamic iframe** - iframe added via JS gets synchronized
+5. **All animation types in iframe** - CSS, rAF, WAAPI, video, GSAP all work
+6. **Speed changes propagate** - Changing speed updates all frames immediately
+7. **Pause/resume propagates** - Pausing stops all frames, resume restarts all
+
+## Testing
+
+### Test Commands
+
+```bash
+npm run test:unit      # Unit tests (Vitest)
+npm run test:e2e       # E2E tests (Playwright) - runs headlessly
+npm run test:all       # Both unit + E2E
+npm run test:e2e:extension  # Extension tests (requires headed Chrome)
+```
+
+### Test Coverage
+
+| Category | Tests | What's Measured |
+|----------|-------|-----------------|
+| CSS Animations | 5 | playbackRate, pause, progress, exclusions |
+| requestAnimationFrame | 4 | timestamp scaling, virtual time, pause |
+| Web Animations API | 5 | playbackRate, currentTime, dynamic animations |
+| Video/Audio | 8 | playbackRate, clamping, pause/resume |
+| GSAP | 4 | globalTimeline.timeScale |
+| iframe sync | 7 | postMessage sync, pause propagation |
+| Unit tests | 29 | API, virtual time, tracking |
+
+**Total: ~125 automated tests across Chromium/Firefox/WebKit**
+
+### Manual Extension Testing
+
+Automated Playwright tests cannot reliably inject Chrome extension content scripts. To manually verify extension iframe support:
+
+1. Load extension: `chrome://extensions` → Developer mode → Load unpacked → `extension/`
+2. Start test server: `npx vite --config vite.test.config.ts`
+3. Open: `http://localhost:5174/tests/fixtures/extension-test.html`
+4. Verify slowmo UI appears and controls ALL spinners (parent + 3 levels of iframes)
+
+### Test Fixtures
+
+| File | Purpose |
+|------|---------|
+| `tests/fixtures/extension-test.html` | Extension test - NO slowmo loaded |
+| `tests/fixtures/plain-iframe.html` | Plain iframe for extension testing |
+| `tests/fixtures/plain-iframe-nested.html` | Nested iframe (2 levels) |
+| `tests/fixtures/plain-iframe-inner.html` | Inner iframe (3 levels deep) |
+| `tests/fixtures/iframe-demo.html` | Manual demo WITH slowmo (not for extension) |
+| `tests/fixtures/test-page.html` | E2E test page with all animation types |
+
+### Gotchas
+
+1. **Port 5173 vs 5174**: Demo runs on 5173, tests run on 5174. Don't mix them.
+2. **Extension tests are skipped**: Playwright can't inject extensions reliably. Use manual testing.
+3. **WebKit video timing**: One test skipped due to unreliable video timing in headless WebKit.
+4. **iframe-demo.html vs extension-test.html**: The demo page HAS slowmo loaded. For testing the extension's injection, use `extension-test.html` which has NO slowmo.
+
+## Future Work
+
+1. **CI Integration** - Add GitHub Actions workflow for `npm run test:all`
+2. **Cross-origin iframe testing** - Would require a separate origin server
+3. **Extension E2E** - Consider Puppeteer for better extension support
+4. **Visual regression** - Screenshot comparison tests for animation states

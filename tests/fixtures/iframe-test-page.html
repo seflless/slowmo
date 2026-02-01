@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>iframe Sync Test Page</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: system-ui, sans-serif; background: #111; color: #fff; padding: 20px; }
+      h1 { margin-bottom: 20px; }
+      .test-section { margin-bottom: 30px; }
+      .test-section h2 { font-size: 16px; color: #888; margin-bottom: 10px; }
+      iframe { width: 100%; height: 120px; border: 1px solid #333; border-radius: 8px; background: #1a1a1a; }
+      .controls { display: flex; gap: 10px; margin-bottom: 20px; }
+      button {
+        padding: 8px 16px;
+        border: 1px solid #333;
+        border-radius: 4px;
+        background: #222;
+        color: #fff;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      button:hover { background: #333; }
+      button.active { background: #f59e0b; color: #000; border-color: #f59e0b; }
+      .status { color: #888; font-size: 14px; margin-top: 10px; }
+
+      /* Parent animation */
+      .parent-spinner {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #ec4899, #f43f5e);
+        animation: spin 2s linear infinite;
+        margin: 20px 0;
+      }
+      @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    </style>
+  </head>
+  <body>
+    <h1>iframe Sync Test Page</h1>
+    <p class="status">For testing Chrome extension iframe synchronization</p>
+
+    <div class="controls">
+      <button data-speed="0.25">0.25x</button>
+      <button data-speed="0.5">0.5x</button>
+      <button data-speed="1" class="active">1x</button>
+      <button data-speed="2">2x</button>
+    </div>
+
+    <!-- Parent frame animation -->
+    <div class="test-section">
+      <h2>Parent Frame Animation</h2>
+      <div class="parent-spinner" id="parent-spinner"></div>
+      <div class="status" id="parent-status">PlaybackRate: 1</div>
+    </div>
+
+    <!-- Same-origin iframe -->
+    <div class="test-section">
+      <h2>Same-origin iframe</h2>
+      <iframe id="same-origin-iframe" src="./iframe-child.html"></iframe>
+    </div>
+
+    <!-- Dynamic iframe container -->
+    <div class="test-section">
+      <h2>Dynamic iframe (added after page load)</h2>
+      <div id="dynamic-iframe-container"></div>
+      <button id="add-iframe-btn" style="margin-top: 10px;">Add iframe</button>
+    </div>
+
+    <!-- Nested iframe - loads child page which can contain another iframe -->
+    <div class="test-section">
+      <h2>Nested iframe</h2>
+      <iframe id="nested-iframe" src="./iframe-child.html"></iframe>
+    </div>
+
+    <script type="module">
+      // Note: This page does NOT load slowmo - it's meant to be controlled by the extension
+      // The extension injects slowmo into all frames
+
+      // Speed control buttons (for manual testing / extension testing)
+      document.querySelectorAll('[data-speed]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const speed = parseFloat(btn.dataset.speed);
+
+          // Update button states
+          document.querySelectorAll('[data-speed]').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+
+          // If slowmo is available (injected by extension), use it
+          if (window.slowmo) {
+            window.slowmo(speed);
+          }
+
+          // Update status
+          updateParentStatus();
+        });
+      });
+
+      function updateParentStatus() {
+        const anims = document.getAnimations();
+        if (anims.length > 0) {
+          document.getElementById('parent-status').textContent =
+            `PlaybackRate: ${anims[0].playbackRate}`;
+        }
+      }
+
+      // Dynamic iframe button
+      document.getElementById('add-iframe-btn').addEventListener('click', () => {
+        const container = document.getElementById('dynamic-iframe-container');
+        const iframe = document.createElement('iframe');
+        iframe.id = 'dynamic-iframe';
+        iframe.src = './iframe-child.html';
+        container.innerHTML = '';
+        container.appendChild(iframe);
+      });
+
+      // Poll for status updates
+      setInterval(updateParentStatus, 200);
+
+      // Test helpers
+      window.testHelpers = {
+        getParentAnimationPlaybackRate() {
+          const anims = document.getAnimations();
+          return anims.length > 0 ? anims[0].playbackRate : null;
+        },
+
+        getSameOriginIframePlaybackRate() {
+          const iframe = document.getElementById('same-origin-iframe');
+          try {
+            const anims = iframe.contentWindow.document.getAnimations();
+            return anims.length > 0 ? anims[0].playbackRate : null;
+          } catch (e) {
+            return null;
+          }
+        },
+
+        getDynamicIframePlaybackRate() {
+          const iframe = document.getElementById('dynamic-iframe');
+          if (!iframe) return null;
+          try {
+            const anims = iframe.contentWindow.document.getAnimations();
+            return anims.length > 0 ? anims[0].playbackRate : null;
+          } catch (e) {
+            return null;
+          }
+        },
+
+        addDynamicIframe() {
+          document.getElementById('add-iframe-btn').click();
+        }
+      };
+    </script>
+  </body>
+</html>

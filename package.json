@@ -31,7 +31,12 @@
     "build": "vite build",
     "build:demo": "vite build --config vite.demo.config.ts",
     "test": "vitest run",
+    "test:unit": "vitest run tests/unit",
     "test:watch": "vitest",
+    "test:e2e": "playwright test --config tests/e2e/playwright.config.ts",
+    "test:e2e:ui": "playwright test --config tests/e2e/playwright.config.ts --ui",
+    "test:e2e:extension": "playwright test --config tests/e2e/extension/extension.config.ts",
+    "test:all": "npm run test:unit && npm run test:e2e",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build",
     "release:patch": "npm version patch && npm publish",
@@ -60,13 +65,14 @@
     "url": "https://github.com/seflless/slowmo/issues"
   },
   "devDependencies": {
+    "@playwright/test": "^1.42.0",
     "@types/node": "^20.11.0",
+    "@vitest/coverage-v8": "^1.2.1",
+    "jsdom": "^24.0.0",
     "typescript": "^5.3.3",
     "vite": "^5.0.11",
     "vite-plugin-dts": "^3.7.1",
-    "vitest": "^1.2.1",
-    "jsdom": "^24.0.0",
-    "@vitest/coverage-v8": "^1.2.1"
+    "vitest": "^1.2.1"
   },
   "peerDependencies": {
     "gsap": ">=3.0.0"

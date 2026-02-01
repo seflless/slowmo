@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Plain iframe - no slowmo</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        background: #1a1a1a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        gap: 15px;
+      }
+      .spinner {
+        width: 35px;
+        height: 35px;
+        border-radius: 6px;
+        background: linear-gradient(135deg, #fbbf24, #f59e0b);
+        animation: spin 2s linear infinite;
+      }
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      .label {
+        color: #888;
+        font-family: system-ui, sans-serif;
+        font-size: 11px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      <div class="spinner"></div>
+      <div class="label">iframe<br>(no slowmo)</div>
+    </div>
+
+    <script>
+      // NO slowmo loaded!
+      // Extension should inject via all_frames: true
+    </script>
+  </body>
+</html>

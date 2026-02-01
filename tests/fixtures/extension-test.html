@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Extension Test - No slowmo loaded</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: system-ui, sans-serif;
+        background: #0c0a09;
+        color: #fff;
+        padding: 20px;
+        min-height: 100vh;
+      }
+      h1 { margin-bottom: 10px; color: #f59e0b; }
+      .subtitle { color: #888; margin-bottom: 20px; font-size: 14px; }
+      .note {
+        background: #1c1917;
+        border: 1px solid #f59e0b;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+        font-size: 14px;
+        color: #fbbf24;
+      }
+
+      .demo-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+      .demo-section {
+        background: #1c1917;
+        border-radius: 12px;
+        padding: 20px;
+      }
+      .demo-section h2 {
+        font-size: 14px;
+        color: #888;
+        margin-bottom: 15px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .animation-row {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+      }
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        animation: spin 2s linear infinite;
+      }
+      .spinner.pink { background: linear-gradient(135deg, #ec4899, #f43f5e); }
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      .label { color: #a8a29e; font-size: 13px; }
+
+      iframe {
+        width: 100%;
+        height: 150px;
+        border: 1px solid #333;
+        border-radius: 8px;
+        background: #0c0a09;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Extension Test Page</h1>
+    <p class="subtitle">This page does NOT load slowmo. The extension must inject it.</p>
+
+    <div class="note">
+      <strong>To test:</strong><br>
+      1. Load extension in Chrome: chrome://extensions → Developer mode → Load unpacked → select <code>extension/</code><br>
+      2. Refresh this page<br>
+      3. The slowmo UI should appear (floating panel)<br>
+      4. Change speed - ALL spinners (parent + iframes) should sync
+    </div>
+
+    <div class="demo-grid">
+      <!-- Parent Frame Animation -->
+      <div class="demo-section">
+        <h2>Parent Frame (this page)</h2>
+        <div class="animation-row">
+          <div class="spinner pink"></div>
+          <div class="label">CSS Animation - should slow down</div>
+        </div>
+      </div>
+
+      <!-- iframe 1 - plain HTML, no slowmo -->
+      <div class="demo-section">
+        <h2>iframe #1 (no slowmo loaded)</h2>
+        <iframe src="./plain-iframe.html"></iframe>
+      </div>
+
+      <!-- iframe 2 -->
+      <div class="demo-section">
+        <h2>iframe #2 (no slowmo loaded)</h2>
+        <iframe src="./plain-iframe.html"></iframe>
+      </div>
+
+      <!-- Nested iframe -->
+      <div class="demo-section">
+        <h2>Nested iframe (iframe contains iframe)</h2>
+        <iframe src="./plain-iframe-nested.html"></iframe>
+      </div>
+    </div>
+
+    <script>
+      // NO slowmo loaded here!
+      // The extension should inject it via content_scripts with all_frames: true
+
+      // Just expose a helper for debugging
+      window.checkSlowmo = function() {
+        console.log('window.slowmo:', typeof window.slowmo);
+        console.log('window.__slowmoExtensionLoaded:', window.__slowmoExtensionLoaded);
+        const anims = document.getAnimations();
+        console.log('Animations:', anims.length, 'playbackRate:', anims[0]?.playbackRate);
+      };
+    </script>
+  </body>
+</html>

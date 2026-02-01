@@ -4,3 +4,5 @@ dist-demo/
 *.log
 .DS_Store
 .context/
+playwright-report/
+test-results/
