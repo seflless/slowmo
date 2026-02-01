@@ -167,3 +167,10 @@ Automated Playwright tests cannot reliably inject Chrome extension content scrip
 2. **Extension tests are skipped**: Playwright can't inject extensions reliably. Use manual testing.
 3. **WebKit video timing**: One test skipped due to unreliable video timing in headless WebKit.
 4. **iframe-demo.html vs extension-test.html**: The demo page HAS slowmo loaded. For testing the extension's injection, use `extension-test.html` which has NO slowmo.
+
+## Future Work
+
+1. **CI Integration** - Add GitHub Actions workflow for `npm run test:all`
+2. **Cross-origin iframe testing** - Would require a separate origin server
+3. **Extension E2E** - Consider Puppeteer for better extension support
+4. **Visual regression** - Screenshot comparison tests for animation states
