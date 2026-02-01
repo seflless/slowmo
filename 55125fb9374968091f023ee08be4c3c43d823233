@@ -1,0 +1,27 @@
+demo/index.html
+  1674ae7e68f2dd6f 264-266,268,756-757,759,880,900-910,913-917
+extension/content.js
+  1674ae7e68f2dd6f 188,191-219,221-241,243-258,260-269,272-279,282,290,296,298,302-368,370-372,376-381,383-402,404-406,409-413,415,417-419,421-422,425-429,432-433,436-456,458,460-474,476,478-485,487-489,491,493-495,499-506,558-559,571-572,602-603,608
+src/dial.ts
+  1674ae7e68f2dd6f 1-411
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.41",
+  "base_commit_sha": "55125fb9374968091f023ee08be4c3c43d823233",
+  "prompts": {
+    "1674ae7e68f2dd6f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a809ae7-4cd3-47dc-a60d-05f9d9c9565b",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Francois Laberge <francoislaberge@gmail.com>",
+      "messages": [],
+      "total_additions": 861,
+      "total_deletions": 736,
+      "accepted_lines": 709,
+      "overriden_lines": 0
+    }
+  }
+}
