@@ -261,76 +261,11 @@
         margin-bottom: 1.5rem;
       }
 
-      /* The actual controller - reusable component */
-      .slowmo-controller {
-        display: flex;
-        align-items: center;
-        gap: 0.375rem;
-        background: var(--bg-elevated);
-        border: 1px solid var(--border);
-        border-radius: 100px;
-        padding: 0.375rem 0.5rem;
-        box-shadow:
-          0 4px 24px rgba(0, 0, 0, 0.4),
-          0 0 0 1px rgba(255, 255, 255, 0.03);
-        user-select: none;
-      }
-
-      .controller-presets {
-        display: flex;
-        gap: 2px;
-      }
-
-      .preset-btn {
-        padding: 0.5rem 0.75rem;
-        border: none;
-        background: transparent;
-        border-radius: 100px;
-        cursor: pointer;
-        font-family: var(--font-mono);
-        font-size: 1rem;
+      .dial-hint {
+        text-align: center;
+        font-size: 0.75rem;
         color: var(--text-dim);
-        transition: all 0.15s;
-      }
-
-      .preset-btn:hover {
-        background: var(--bg-hover);
-        color: var(--text-muted);
-      }
-
-      .preset-btn.active {
-        background: var(--accent-glow);
-        color: var(--accent);
-      }
-
-      .preset-btn.skip {
-        font-family: var(--font-sans);
-        font-size: 0.875rem;
-      }
-
-      .controller-playpause {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 36px;
-        height: 36px;
-        border: none;
-        background: var(--accent);
-        border-radius: 50%;
-        cursor: pointer;
-        color: var(--bg);
-        transition: all 0.15s;
-        margin: 0 0.25rem;
-      }
-
-      .controller-playpause:hover {
-        transform: scale(1.05);
-        box-shadow: 0 0 12px var(--accent-glow);
-      }
-
-      .controller-playpause svg {
-        width: 16px;
-        height: 16px;
+        margin-top: 0.5rem;
       }
 
       /* Quick Start inline */
@@ -818,41 +753,10 @@
       <!-- Try It Controller -->
       <section class="controller-section fade-up">
         <h2>Try It</h2>
-        <div class="controller-wrapper">
-          <div class="slowmo-controller" id="main-controller">
-            <div class="controller-presets slow-presets">
-              <button class="preset-btn" data-speed="0.1">⅒</button>
-              <button class="preset-btn" data-speed="0.25">¼</button>
-              <button class="preset-btn" data-speed="0.5">½</button>
-            </div>
-            <button class="controller-playpause" id="pause-btn" title="Pause">
-              <svg
-                class="play-icon"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                style="display: none"
-              >
-                <polygon points="6 3 20 12 6 21 6 3"></polygon>
-              </svg>
-              <svg class="pause-icon" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="6" y="4" width="4" height="16" rx="1"></rect>
-                <rect x="14" y="4" width="4" height="16" rx="1"></rect>
-              </svg>
-            </button>
-            <div class="controller-presets fast-presets">
-              <button class="preset-btn active" data-speed="1">1×</button>
-              <button class="preset-btn" data-speed="2">2×</button>
-              <button
-                class="preset-btn"
-                data-speed="Infinity"
-                id="infinity-btn"
-                title="Maximum speed"
-              >
-                ∞
-              </button>
-            </div>
-          </div>
+        <div class="controller-wrapper" id="dial-container">
+          <!-- Dial will be inserted here -->
         </div>
+        <p class="dial-hint">Drag outer edge to change speed. Click center to pause.</p>
       </section>
 
       <!-- Demos -->
@@ -973,6 +877,7 @@ slowmo.<span class="function">getSpeed</span>()     <span class="comment">// cur
 
     <script type="module">
       import { slowmo } from "../src/index.ts";
+      import { createDial } from "../src/dial.ts";
 
       // Copy install command
       window.copyInstall = function () {
@@ -992,60 +897,24 @@ slowmo.<span class="function">getSpeed</span>()     <span class="comment">// cur
         }, 2000);
       };
 
-      // Current speed state
-      let currentSpeed = 1;
-      let isPaused = false;
-
-      // Speed presets for stepping
-      const speedPresets = [0.1, 0.25, 0.5, 1, 2, 4];
-
-      function updateSpeed(speed, paused = false) {
-        isPaused = paused;
-        currentSpeed = speed;
-        slowmo(paused ? 0 : speed);
-
-        // Update pause button
-        const pauseBtn = document.getElementById("pause-btn");
-        const playIcon = pauseBtn.querySelector(".play-icon");
-        const pauseIcon = pauseBtn.querySelector(".pause-icon");
-        playIcon.style.display = paused ? "block" : "none";
-        pauseIcon.style.display = paused ? "none" : "block";
-
-        // Update preset buttons (including infinity)
-        document.querySelectorAll(".preset-btn[data-speed]").forEach((btn) => {
-          const btnSpeed =
-            btn.dataset.speed === "Infinity"
-              ? Infinity
-              : parseFloat(btn.dataset.speed);
-          btn.classList.toggle("active", btnSpeed === speed && !paused);
-        });
-      }
-
-      // Pause button
-      document.getElementById("pause-btn").addEventListener("click", () => {
-        updateSpeed(currentSpeed, !isPaused);
+      // Create the dial controller (inline in the page, not floating)
+      const dialContainer = document.getElementById("dial-container");
+      const dial = createDial({
+        onSpeedChange: (speed) => {
+          slowmo(speed);
+        },
+        onPauseToggle: (paused) => {
+          // Dial handles pause internally via onSpeedChange(0)
+        },
+        initialSpeed: 1,
+        initialPaused: false
       });
 
-      // Preset buttons (including infinity)
-      document.querySelectorAll(".preset-btn[data-speed]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const speed =
-            btn.dataset.speed === "Infinity"
-              ? Infinity
-              : parseFloat(btn.dataset.speed);
-          updateSpeed(speed, false);
-
-          // If infinity, jump videos to the end and pause
-          if (speed === Infinity) {
-            document.querySelectorAll("video, audio").forEach((media) => {
-              if (media.duration && isFinite(media.duration)) {
-                media.currentTime = media.duration;
-                media.pause();
-              }
-            });
-          }
-        });
-      });
+      // Override the dial's position to be inline instead of fixed
+      dial.style.position = 'relative';
+      dial.style.right = 'auto';
+      dial.style.bottom = 'auto';
+      dialContainer.appendChild(dial);
 
       // requestAnimationFrame animation
       const rafBox = document.getElementById("raf-box");
