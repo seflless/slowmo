@@ -12,6 +12,16 @@
       "require": "./dist/slowmo.cjs",
       "types": "./dist/index.d.ts"
     },
+    "./dial": {
+      "import": "./dist/dial.js",
+      "require": "./dist/dial.cjs",
+      "types": "./dist/dial-api.d.ts"
+    },
+    "./react": {
+      "import": "./dist/react.js",
+      "require": "./dist/react.cjs",
+      "types": "./dist/react.d.ts"
+    },
     "./recreate": {
       "import": "./dist/recreate.js",
       "require": "./dist/recreate.cjs",
@@ -68,6 +78,7 @@
   "devDependencies": {
     "@playwright/test": "^1.42.0",
     "@types/node": "^20.11.0",
+    "@types/react": "^19.2.10",
     "@vitest/coverage-v8": "^1.2.1",
     "jsdom": "^24.0.0",
     "typescript": "^5.3.3",
@@ -76,10 +87,14 @@
     "vitest": "^1.2.1"
   },
   "peerDependencies": {
-    "gsap": ">=3.0.0"
+    "gsap": ">=3.0.0",
+    "react": ">=16.8.0"
   },
   "peerDependenciesMeta": {
     "gsap": {
+      "optional": true
+    },
+    "react": {
       "optional": true
     }
   },

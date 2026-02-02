@@ -13,6 +13,8 @@ export default defineConfig({
     lib: {
       entry: {
         slowmo: resolve(__dirname, 'src/index.ts'),
+        dial: resolve(__dirname, 'src/dial-api.ts'),
+        react: resolve(__dirname, 'src/react.tsx'),
         recreate: resolve(__dirname, 'src/recreate.ts'),
         'cli/recreate': resolve(__dirname, 'src/cli/recreate.ts'),
       },
@@ -20,7 +22,7 @@ export default defineConfig({
       formats: ['es', 'cjs'],
     },
     rollupOptions: {
-      external: ['gsap', 'fs', 'path'],
+      external: ['gsap', 'fs', 'path', 'react', 'node:fs', 'node:path', 'node:os', 'node:child_process'],
       output: {
         globals: {
           gsap: 'gsap',

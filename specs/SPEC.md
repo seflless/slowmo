@@ -25,6 +25,43 @@ slowmo.play();
 slowmo.reset();
 ```
 
+## Dial Component API
+
+The dial provides a visual UI for controlling slowmo speed.
+
+### Vanilla JS (`slowmo/dial`)
+
+```js
+import { setupDial, shutdownDial, isDialActive } from 'slowmo/dial';
+
+setupDial();         // Returns HTMLElement or null (if already active)
+shutdownDial();      // Removes dial, cleans up listeners
+isDialActive();      // Returns boolean
+```
+
+**Singleton:** Only one dial can exist. Second `setupDial()` returns null.
+
+### React (`slowmo/react`)
+
+```jsx
+import { Slowmo } from 'slowmo/react';
+<Slowmo />  // Mount in app, auto-cleans on unmount
+```
+
+### Dial Interaction Zones
+
+| Zone | Radius | Action |
+|------|--------|--------|
+| Center | 0-14px | Toggle pause/play |
+| Middle | 14-24px | Drag to reposition |
+| Outer | 24px+ | Rotate to change speed (Pointer Lock) |
+
+### Speed Range
+
+- Min: 1/60 (~0.017x)
+- Max: 10x
+- Snaps to 1x when close (0.92-1.08 range)
+
 ## What It Controls
 
 | Animation Type | How It's Controlled |
