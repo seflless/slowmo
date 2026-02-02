@@ -13,20 +13,26 @@
  * 2. **performance.now() patching**: We replace performance.now() to return
  *    virtual time. Libraries that use this for timing will be affected.
  *
- * 3. **Web Animations API**: We poll document.getAnimations() and modify the
+ * 3. **Date.now() patching**: We replace Date.now() to return virtual epoch
+ *    milliseconds. Libraries like Motion/Framer Motion use this for timing.
+ *
+ * 4. **setTimeout/setInterval patching**: We scale delays by inverse of speed
+ *    so timed callbacks fire at the expected virtual time.
+ *
+ * 5. **Web Animations API**: We poll document.getAnimations() and modify the
  *    playbackRate of all Animation objects. This affects CSS animations,
  *    CSS transitions, and element.animate() calls.
  *
- * 4. **Media elements**: We set playbackRate on video/audio elements.
+ * 6. **Media elements**: We set playbackRate on video/audio elements.
  *
  * ## Limitations:
  *
  * - Frame-based animations (that increment by a fixed amount per frame without
- *   using timestamps) cannot be smoothly slowed down. See IDEAS.md for a
- *   potential "frame throttling" mode.
+ *   using timestamps) cannot be smoothly slowed down.
  *
  * - Animations created by libraries that cache their own time references
- *   before we patch may not be affected.
+ *   before we patch may not be affected. The Chrome extension runs at
+ *   document_start to minimize this issue.
  */
 
 let currentSpeed = 1;
@@ -36,12 +42,20 @@ let isInstalled = false;
 // Original functions we'll patch
 let originalRAF: typeof requestAnimationFrame;
 let originalPerformanceNow: typeof performance.now;
+let originalDateNow: typeof Date.now;
+let originalSetTimeout: typeof setTimeout;
+let originalSetInterval: typeof setInterval;
 
 // Time tracking for rAF timestamp manipulation
 // We maintain "virtual time" that progresses at currentSpeed relative to real time
 let virtualTime = 0;
 let lastRealTime = 0;
 let pauseTime = 0;
+
+// Date.now tracking (epoch milliseconds, separate from performance.now)
+let virtualDateNow = 0;
+let lastRealDateNow = 0;
+let pauseDateNow = 0;
 
 /**
  * Track Animation playback rates to handle developer changes.
@@ -85,6 +99,17 @@ function getVirtualTime(realTime: number): number {
   // For infinity speed, jump time forward very quickly (1000x real time)
   const effectiveSpeed = currentSpeed === Infinity ? 1000 : currentSpeed;
   return virtualTime + elapsed * effectiveSpeed;
+}
+
+/**
+ * Get virtual Date.now() time from real Date.now() time.
+ * Similar to getVirtualTime but for epoch milliseconds.
+ */
+function getVirtualDateNow(realDateNow: number): number {
+  if (isPaused) return pauseDateNow;
+  const elapsed = realDateNow - lastRealDateNow;
+  const effectiveSpeed = currentSpeed === Infinity ? 1000 : currentSpeed;
+  return virtualDateNow + elapsed * effectiveSpeed;
 }
 
 /**
@@ -241,13 +266,51 @@ function pollAnimations(): void {
 function install(): void {
   if (isInstalled || typeof window === 'undefined') return;
 
-  // Capture original functions BEFORE patching
-  originalRAF = window.requestAnimationFrame.bind(window);
-  originalPerformanceNow = performance.now.bind(performance);
+  // Check if extension is present - if so, we take over using its stored originals
+  const extensionPresent = (window as any).__slowmoExtension === true;
+  const storedOriginals = (window as any).__slowmoOriginals;
 
-  // Initialize virtual time to current real time
-  lastRealTime = originalPerformanceNow();
-  virtualTime = lastRealTime;
+  if (extensionPresent && storedOriginals) {
+    // Extension ran first - use its stored REAL originals (not its patches)
+    // This lets the library's code run instead of the extension's
+    console.log('⏱️ slowmo: Embedded library taking over from extension');
+    originalRAF = storedOriginals.requestAnimationFrame;
+    originalPerformanceNow = storedOriginals.performanceNow;
+    originalDateNow = storedOriginals.dateNow;
+    originalSetTimeout = storedOriginals.setTimeout;
+    originalSetInterval = storedOriginals.setInterval;
+  } else {
+    // No extension, capture current functions as originals
+    if (!originalRAF) {
+      originalRAF = window.requestAnimationFrame.bind(window);
+    }
+    if (!originalPerformanceNow) {
+      originalPerformanceNow = performance.now.bind(performance);
+    }
+    if (!originalDateNow) {
+      originalDateNow = Date.now.bind(Date);
+    }
+  }
+
+  // Initialize virtual time to current real time (if not already set)
+  if (lastRealTime === 0) {
+    lastRealTime = originalPerformanceNow();
+    virtualTime = lastRealTime;
+  }
+
+  // Initialize virtual Date.now to current real Date.now (if not already set)
+  if (lastRealDateNow === 0) {
+    lastRealDateNow = originalDateNow();
+    virtualDateNow = lastRealDateNow;
+  }
+
+  // If extension is present, we're taking over - don't skip patching
+  // Otherwise, check if another library instance already installed
+  if (!extensionPresent && (window as any).__slowmoInstalled) {
+    isInstalled = true;
+    return;
+  }
+  (window as any).__slowmoInstalled = true;
 
   /**
    * Patched requestAnimationFrame.
@@ -290,6 +353,51 @@ function install(): void {
     return getVirtualTime(originalPerformanceNow());
   };
 
+  /**
+   * Patched Date.now().
+   *
+   * Returns virtual epoch time instead of real time. Many animation
+   * libraries (including Motion/Framer Motion) use Date.now() for timing.
+   */
+  Date.now = (): number => {
+    return getVirtualDateNow(originalDateNow());
+  };
+
+  /**
+   * Patched setTimeout/setInterval.
+   *
+   * Scales delays by inverse of speed so timed callbacks fire at the
+   * expected virtual time. At 0.5x speed, a 100ms timeout waits 200ms real time.
+   * When paused (speed=0), delays become Infinity (won't fire until resumed).
+   */
+  // Only capture if not already set (e.g., from extension's stored originals)
+  if (!originalSetTimeout) {
+    originalSetTimeout = window.setTimeout.bind(window);
+  }
+  if (!originalSetInterval) {
+    originalSetInterval = window.setInterval.bind(window);
+  }
+
+  (window as any).setTimeout = ((
+    callback: TimerHandler,
+    delay?: number,
+    ...args: any[]
+  ): number => {
+    const effectiveSpeed = currentSpeed || 0.0001; // Avoid division by zero
+    const scaledDelay = (delay ?? 0) / effectiveSpeed;
+    return originalSetTimeout(callback, scaledDelay, ...args);
+  }) as typeof setTimeout;
+
+  (window as any).setInterval = ((
+    callback: TimerHandler,
+    delay?: number,
+    ...args: any[]
+  ): number => {
+    const effectiveSpeed = currentSpeed || 0.0001; // Avoid division by zero
+    const scaledDelay = (delay ?? 0) / effectiveSpeed;
+    return originalSetInterval(callback, scaledDelay, ...args);
+  }) as typeof setInterval;
+
   // Start polling loop using ORIGINAL rAF (not our patched version)
   // so polling happens at real-time intervals regardless of speed
   originalRAF(pollAnimations);
@@ -317,11 +425,17 @@ function setSpeed(speed: number): void {
   virtualTime = getVirtualTime(realNow);
   lastRealTime = realNow;
 
+  // Also checkpoint Date.now
+  const realDateNowValue = originalDateNow();
+  virtualDateNow = getVirtualDateNow(realDateNowValue);
+  lastRealDateNow = realDateNowValue;
+
   currentSpeed = speed;
   isPaused = speed === 0;
 
   if (isPaused) {
     pauseTime = virtualTime;
+    pauseDateNow = virtualDateNow;
   }
 
   // Immediately update all tracked animations with new speed

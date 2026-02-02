@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Motion Library Test - Slowmo</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0c0a09;
+      color: #fafaf9;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem;
+      gap: 2rem;
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 1rem; }
+    .demos {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2rem;
+      justify-content: center;
+    }
+    .demo-card {
+      background: #1c1917;
+      border: 1px solid #292524;
+      border-radius: 12px;
+      padding: 1.5rem;
+      width: 250px;
+    }
+    .demo-card h3 {
+      font-size: 0.875rem;
+      color: #a8a29e;
+      margin-bottom: 1rem;
+    }
+    .demo-area {
+      height: 150px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0c0a09;
+      border-radius: 8px;
+    }
+    #speed-display {
+      font-size: 1.25rem;
+      color: #f59e0b;
+      text-align: center;
+    }
+    .controls {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    button {
+      background: #292524;
+      border: 1px solid #3d3835;
+      color: #fafaf9;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+    button:hover {
+      background: #3d3835;
+    }
+    .info {
+      background: #1c1917;
+      border: 1px solid #292524;
+      padding: 1rem;
+      border-radius: 8px;
+      max-width: 600px;
+      font-size: 0.875rem;
+      color: #a8a29e;
+    }
+    .info code {
+      background: #292524;
+      padding: 0.125rem 0.375rem;
+      border-radius: 4px;
+      color: #f59e0b;
+    }
+  </style>
+</head>
+<body>
+  <h1>Motion Library + Slowmo Test</h1>
+
+  <div id="speed-display">Speed: 1x</div>
+
+  <div class="controls">
+    <button onclick="setSlowmo(0.1)">0.1x</button>
+    <button onclick="setSlowmo(0.25)">0.25x</button>
+    <button onclick="setSlowmo(0.5)">0.5x</button>
+    <button onclick="setSlowmo(1)">1x</button>
+    <button onclick="setSlowmo(2)">2x</button>
+    <button onclick="slowmo.pause()">Pause</button>
+    <button onclick="slowmo.play()">Play</button>
+  </div>
+
+  <div class="demos">
+    <!-- Motion whileHover test -->
+    <div class="demo-card">
+      <h3>Motion: whileHover (keyframes)</h3>
+      <div class="demo-area">
+        <div id="motion-hover-box"></div>
+      </div>
+    </div>
+
+    <!-- Motion animate -->
+    <div class="demo-card">
+      <h3>Motion: animate() continuous</h3>
+      <div class="demo-area">
+        <div id="motion-animate-box"></div>
+      </div>
+    </div>
+
+    <!-- Web Animations API baseline -->
+    <div class="demo-card">
+      <h3>Web Animations API (baseline)</h3>
+      <div class="demo-area">
+        <div id="waa-box" style="width: 60px; height: 60px; background: linear-gradient(135deg, #4ade80, #34d399); border-radius: 8px;"></div>
+      </div>
+    </div>
+
+    <!-- CSS Animation baseline -->
+    <div class="demo-card">
+      <h3>CSS Animation (baseline)</h3>
+      <div class="demo-area">
+        <div id="css-box" style="width: 60px; height: 60px; background: linear-gradient(135deg, #f472b6, #fb7185); border-radius: 8px; animation: spin 2s linear infinite;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info">
+    <strong>Testing:</strong> Hover over the Motion boxes to trigger animations.
+    Compare with the baseline CSS and Web Animations API boxes.
+    If slowmo works correctly, all animations should slow down together.
+    <br><br>
+    <strong>Debug output:</strong> Check the console for animation timing info.
+  </div>
+
+  <div id="debug-output" style="font-family: monospace; font-size: 0.75rem; color: #57534e; max-width: 600px;"></div>
+
+  <style>
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    #motion-hover-box, #motion-animate-box {
+      width: 60px;
+      height: 60px;
+      background: #0cdcf7;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+  </style>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "motion": "https://cdn.jsdelivr.net/npm/motion@12.6.4/+esm",
+      "motion/react": "https://cdn.jsdelivr.net/npm/motion@12.6.4/dist/react.mjs"
+    }
+  }
+  </script>
+
+  <script type="module">
+    // Import slowmo FIRST to patch time functions before Motion loads
+    import { slowmo } from '../../src/index.ts';
+
+    // Make slowmo available globally for the buttons
+    window.slowmo = slowmo;
+    window.setSlowmo = (speed) => {
+      slowmo(speed);
+      document.getElementById('speed-display').textContent = `Speed: ${speed}x`;
+    };
+
+    // Now import Motion (AFTER slowmo has patched Date.now and performance.now)
+    const motion = await import('motion');
+    console.log('Motion loaded:', motion);
+    console.log('Date.now is patched:', Date.now !== window._origDateNow);
+
+    // Debug: track what animations get created
+    const origGetAnimations = document.getAnimations.bind(document);
+    let lastAnimCount = 0;
+    setInterval(() => {
+      const anims = origGetAnimations();
+      if (anims.length !== lastAnimCount) {
+        console.log(`[Animations] Count changed: ${lastAnimCount} -> ${anims.length}`);
+        anims.forEach(a => {
+          const target = a.effect?.target;
+          console.log('  -', target?.id || target?.className || 'unknown', 'playbackRate:', a.playbackRate, 'state:', a.playState);
+        });
+        lastAnimCount = anims.length;
+      }
+    }, 500);
+
+    // Test 1: Motion animate() - continuous animation
+    const animateBox = document.getElementById('motion-animate-box');
+    if (motion.animate) {
+      const animation = motion.animate(
+        animateBox,
+        {
+          scale: [1, 1.2, 1],
+          rotate: [0, 180, 360]
+        },
+        {
+          duration: 2,
+          repeat: Infinity,
+          ease: "easeInOut"
+        }
+      );
+      console.log('Motion animation created:', animation);
+
+      // Log the underlying animation
+      setTimeout(() => {
+        const anims = document.getAnimations();
+        console.log('All document animations:', anims);
+        anims.forEach(a => {
+          const effect = a.effect;
+          if (effect && effect.target === animateBox) {
+            console.log('Motion box animation:', a, 'playbackRate:', a.playbackRate);
+          }
+        });
+      }, 100);
+    }
+
+    // Test 2: whileHover-like behavior (manual implementation since we're not using React)
+    const hoverBox = document.getElementById('motion-hover-box');
+
+    hoverBox.addEventListener('mouseenter', () => {
+      console.log('[Hover] Starting hover animation');
+      if (motion.animate) {
+        motion.animate(
+          hoverBox,
+          {
+            scale: [null, 1.1, 1.6],
+          },
+          {
+            duration: 0.5,
+            ease: ["easeInOut", "easeOut"],
+          }
+        );
+      }
+    });
+
+    hoverBox.addEventListener('mouseleave', () => {
+      console.log('[Hover] Starting leave animation');
+      if (motion.animate) {
+        motion.animate(
+          hoverBox,
+          { scale: 1 },
+          { duration: 0.3, ease: "easeOut" }
+        );
+      }
+    });
+
+    // Baseline: Web Animations API
+    const waaBox = document.getElementById('waa-box');
+    waaBox.animate(
+      [
+        { transform: "translateY(0) scale(1)" },
+        { transform: "translateY(-20px) scale(1.1)" },
+        { transform: "translateY(0) scale(1)" }
+      ],
+      {
+        duration: 1500,
+        iterations: Infinity,
+        easing: "ease-in-out"
+      }
+    );
+
+    // Debug: Periodically check animations
+    setInterval(() => {
+      const anims = document.getAnimations();
+      const motionAnims = anims.filter(a => {
+        const effect = a.effect;
+        return effect && (effect.target === animateBox || effect.target === hoverBox);
+      });
+      if (motionAnims.length > 0) {
+        console.log('[Poll] Motion animations:', motionAnims.map(a => ({
+          target: a.effect.target.id,
+          playbackRate: a.playbackRate,
+          playState: a.playState,
+          currentTime: a.currentTime
+        })));
+      }
+    }, 2000);
+
+    console.log('Test page initialized. Try changing speed and hovering over boxes.');
+  </script>
+</body>
+</html>
