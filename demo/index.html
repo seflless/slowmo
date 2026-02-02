@@ -972,20 +972,22 @@ slowmo.<span class="function">getSpeed</span>()     <span class="comment">// cur
 
       // Motion library demo (hover animation)
       const motionBox = document.getElementById("motion-box");
-      try {
-        const { animate } = await import("https://cdn.jsdelivr.net/npm/motion@12/+esm");
+      (async () => {
+        try {
+          const { animate } = await import("https://cdn.jsdelivr.net/npm/motion@12/+esm");
 
-        motionBox.addEventListener("mouseenter", () => {
-          animate(motionBox, { scale: [null, 1.1, 1.5] }, { duration: 0.5, ease: "easeOut" });
-        });
+          motionBox.addEventListener("mouseenter", () => {
+            animate(motionBox, { scale: [null, 1.1, 1.5] }, { duration: 0.5, ease: "easeOut" });
+          });
 
-        motionBox.addEventListener("mouseleave", () => {
-          animate(motionBox, { scale: 1 }, { duration: 0.3, ease: "easeOut" });
-        });
-      } catch (e) {
-        // Motion library failed to load, skip this demo
-        console.warn("Motion library not available:", e);
-      }
+          motionBox.addEventListener("mouseleave", () => {
+            animate(motionBox, { scale: 1 }, { duration: 0.3, ease: "easeOut" });
+          });
+        } catch (e) {
+          // Motion library failed to load, skip this demo
+          console.warn("Motion library not available:", e);
+        }
+      })();
     </script>
   </body>
 </html>
