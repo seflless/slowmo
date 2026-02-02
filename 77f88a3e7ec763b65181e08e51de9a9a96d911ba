@@ -1,0 +1,31 @@
+.gitignore
+  ffaaca70441c95ed 9
+demo/index.html
+  ffaaca70441c95ed 860
+package.json
+  ffaaca70441c95ed 33
+vite.demo.config.ts
+  ffaaca70441c95ed 10-15
+chrome-extension-checklist.md
+  ffaaca70441c95ed 1-148
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.40",
+  "base_commit_sha": "77f88a3e7ec763b65181e08e51de9a9a96d911ba",
+  "prompts": {
+    "ffaaca70441c95ed": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "827f695b-8d8b-4906-956e-a43d6dcd3998",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Francois Laberge <francoislaberge@gmail.com>",
+      "messages": [],
+      "total_additions": 365,
+      "total_deletions": 8,
+      "accepted_lines": 358,
+      "overriden_lines": 0
+    }
+  }
+}
