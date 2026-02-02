@@ -30,6 +30,7 @@
     "dev": "vite demo",
     "build": "vite build",
     "build:demo": "vite build --config vite.demo.config.ts",
+    "build:extension": "cd extension && zip -r ../slowmo-extension.zip . -x '*.DS_Store' -x 'store-assets/*'",
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
     "test:watch": "vitest",

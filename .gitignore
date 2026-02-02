@@ -6,3 +6,4 @@ dist-demo/
 .context/
 playwright-report/
 test-results/
+slowmo-extension.zip
