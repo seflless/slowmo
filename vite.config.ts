@@ -16,6 +16,7 @@ export default defineConfig({
         dial: resolve(__dirname, 'src/dial-api.ts'),
         react: resolve(__dirname, 'src/react.tsx'),
         recreate: resolve(__dirname, 'src/recreate.ts'),
+        'cli/index': resolve(__dirname, 'src/cli/index.ts'),
         'cli/recreate': resolve(__dirname, 'src/cli/recreate.ts'),
       },
       name: 'slowmo',
