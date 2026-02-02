@@ -20,7 +20,15 @@ export default defineConfig({
       formats: ['es', 'cjs'],
     },
     rollupOptions: {
-      external: ['gsap', 'fs', 'path'],
+      external: [
+        'gsap',
+        'fs',
+        'path',
+        'node:fs',
+        'node:path',
+        'node:os',
+        'node:child_process',
+      ],
       output: {
         globals: {
           gsap: 'gsap',
