@@ -1,0 +1,23 @@
+extension/icons/icon.svg
+  759fd99b55fe115e 1-10
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "4d775850734832d9ad0ae1befe47ea6ebf83c0a3",
+  "prompts": {
+    "759fd99b55fe115e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bbf0dff8-e5d3-4878-8c0e-797628bc366a",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Francois Laberge <francoislaberge@gmail.com>",
+      "messages": [],
+      "total_additions": 15,
+      "total_deletions": 5,
+      "accepted_lines": 10,
+      "overriden_lines": 0
+    }
+  }
+}
