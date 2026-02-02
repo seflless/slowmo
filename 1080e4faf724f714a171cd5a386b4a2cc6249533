@@ -1,0 +1,23 @@
+.gitignore
+  66e4ac6f587e73bf 10-12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.41",
+  "base_commit_sha": "1080e4faf724f714a171cd5a386b4a2cc6249533",
+  "prompts": {
+    "66e4ac6f587e73bf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d89d1496-ba64-486e-9029-a74100cc9a3e",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Francois Laberge <francoislaberge@gmail.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 0,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}
