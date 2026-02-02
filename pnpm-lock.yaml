@@ -11,6 +11,9 @@ importers:
       gsap:
         specifier: '>=3.0.0'
         version: 3.14.2
+      react:
+        specifier: '>=16.8.0'
+        version: 19.2.4
     devDependencies:
       '@playwright/test':
         specifier: ^1.42.0
@@ -979,6 +982,10 @@ packages:
 
   react-is@18.3.1:
     resolution: {integrity: sha512-/LLMVyas0ljjAtoYiPqYiL8VWXzUUdThrmU5+n20DZv+a+ClRoevUzw5JxU+Ieh5/c87ytoTBV9G1FiKfNJdmg==}
+
+  react@19.2.4:
+    resolution: {integrity: sha512-9nfp2hYpCwOjAN+8TZFGhtWEwgvWHXqESH8qT89AT/lWklpLON22Lc8pEtnpsZz7VmawabSU0gCjnj8aC0euHQ==}
+    engines: {node: '>=0.10.0'}
 
   requires-port@1.0.0:
     resolution: {integrity: sha512-KigOCHcocU3XODJxsu8i/j8T9tzT4adHiecwORRQ0ZZFcp7ahwXuRU1m+yuO90C5ZUyGeGfocHDI14M3L3yDAQ==}
@@ -2191,6 +2198,8 @@ snapshots:
   querystringify@2.2.0: {}
 
   react-is@18.3.1: {}
+
+  react@19.2.4: {}
 
   requires-port@1.0.0: {}
 
