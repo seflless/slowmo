@@ -96,6 +96,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
+          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
           echo "Publishing version ${{ steps.versions.outputs.local }} to npm..."
           npm publish
           echo "Published successfully!"
