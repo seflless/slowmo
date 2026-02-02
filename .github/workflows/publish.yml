@@ -1,0 +1,101 @@
+name: Auto Publish
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Skip if version bump commit
+        if: contains(github.event.head_commit.message, '[skip ci]')
+        run: |
+          echo "Skipping - this is a version bump commit"
+          exit 0
+
+      - name: Setup Node
+        if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Setup pnpm
+        if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10
+
+      - name: Install dependencies
+        if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+        run: pnpm install
+
+      - name: Get versions
+        if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+        id: versions
+        run: |
+          LOCAL=$(node -p "require('./package.json').version")
+          NPM=$(npm view slowmo version 2>/dev/null || echo "0.0.0")
+          echo "local=$LOCAL" >> $GITHUB_OUTPUT
+          echo "npm=$NPM" >> $GITHUB_OUTPUT
+          echo "Local version: $LOCAL"
+          echo "NPM version: $NPM"
+
+      - name: Bump version and create PR
+        if: ${{ !contains(github.event.head_commit.message, '[skip ci]') && steps.versions.outputs.local == steps.versions.outputs.npm }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Versions are equal, bumping patch version..."
+
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Create branch and bump version
+          git checkout -b auto-version-bump
+          npm version patch --no-git-tag-version
+          NEW_VERSION=$(node -p "require('./package.json').version")
+
+          # Commit and push
+          git add package.json
+          git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
+          git push -f origin auto-version-bump
+
+          # Create PR and enable auto-merge
+          PR_URL=$(gh pr create \
+            --title "chore: bump version to $NEW_VERSION" \
+            --body "Automated version bump to $NEW_VERSION for npm publish." \
+            --head auto-version-bump \
+            --base main)
+
+          gh pr merge --auto --squash "$PR_URL"
+
+          echo "Created and auto-merging PR: $PR_URL"
+
+      - name: Build
+        if: ${{ !contains(github.event.head_commit.message, '[skip ci]') && steps.versions.outputs.local != steps.versions.outputs.npm }}
+        run: pnpm run build
+
+      - name: Run tests
+        if: ${{ !contains(github.event.head_commit.message, '[skip ci]') && steps.versions.outputs.local != steps.versions.outputs.npm }}
+        run: pnpm test
+
+      - name: Publish to npm
+        if: ${{ !contains(github.event.head_commit.message, '[skip ci]') && steps.versions.outputs.local != steps.versions.outputs.npm }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          echo "Publishing version ${{ steps.versions.outputs.local }} to npm..."
+          npm publish
+          echo "Published successfully!"
