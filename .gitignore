@@ -7,3 +7,6 @@ dist-demo/
 playwright-report/
 test-results/
 slowmo-extension.zip
+.npmrc
+.envrc
+.env
