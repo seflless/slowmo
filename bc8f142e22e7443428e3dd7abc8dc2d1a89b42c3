@@ -1,0 +1,23 @@
+vite.config.ts
+  4444a1ea4b7ad658 26-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "bc8f142e22e7443428e3dd7abc8dc2d1a89b42c3",
+  "prompts": {
+    "4444a1ea4b7ad658": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "54bb51a0-1955-4d10-ade4-b672e0b0581c",
+        "model": "<synthetic>"
+      },
+      "human_author": "Francois Laberge <francoislaberge@gmail.com>",
+      "messages": [],
+      "total_additions": 9,
+      "total_deletions": 1,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    }
+  }
+}
