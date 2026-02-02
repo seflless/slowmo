@@ -7,7 +7,7 @@
 (function() {
   'use strict';
 
-  // Avoid double injection
+  // Avoid double injection (extension loaded twice)
   if (window.__slowmoExtensionLoaded) return;
   window.__slowmoExtensionLoaded = true;
 
@@ -20,9 +20,16 @@
   let isInstalled = false;
   let originalRAF;
   let originalPerformanceNow;
+  let originalDateNow;
+  let originalSetTimeout;
+  let originalSetInterval;
   let virtualTime = 0;
   let lastRealTime = 0;
   let pauseTime = 0;
+  // Date.now tracking (epoch milliseconds)
+  let virtualDateNow = 0;
+  let lastRealDateNow = 0;
+  let pauseDateNow = 0;
 
   const trackedAnimations = new WeakMap();
   const trackedMedia = new WeakMap();
@@ -33,6 +40,13 @@
     // For infinity speed, jump time forward very quickly (1000x real time)
     const effectiveSpeed = currentSpeed === Infinity ? 1000 : currentSpeed;
     return virtualTime + elapsed * effectiveSpeed;
+  }
+
+  function getVirtualDateNow(realDateNow) {
+    if (isPaused) return pauseDateNow;
+    const elapsed = realDateNow - lastRealDateNow;
+    const effectiveSpeed = currentSpeed === Infinity ? 1000 : currentSpeed;
+    return virtualDateNow + elapsed * effectiveSpeed;
   }
 
   function updateWebAnimations() {
@@ -136,10 +150,49 @@
 
   function install() {
     if (isInstalled || typeof window === 'undefined') return;
-    originalRAF = window.requestAnimationFrame.bind(window);
-    originalPerformanceNow = performance.now.bind(performance);
-    lastRealTime = originalPerformanceNow();
-    virtualTime = lastRealTime;
+
+    // Capture the REAL original functions before any patching
+    if (!originalRAF) {
+      originalRAF = window.requestAnimationFrame.bind(window);
+    }
+    if (!originalPerformanceNow) {
+      originalPerformanceNow = performance.now.bind(performance);
+    }
+    if (!originalDateNow) {
+      originalDateNow = Date.now.bind(Date);
+    }
+
+    // Store originals globally so embedded library can use them if it loads later
+    // This allows the library to take over with the real functions (not our patches)
+    window.__slowmoOriginals = {
+      requestAnimationFrame: originalRAF,
+      performanceNow: originalPerformanceNow,
+      dateNow: originalDateNow,
+      setTimeout: window.setTimeout.bind(window),
+      setInterval: window.setInterval.bind(window),
+    };
+
+    // Mark that extension is present (library will check this)
+    window.__slowmoExtension = true;
+
+    // Initialize virtual time to current real time (if not already set)
+    if (lastRealTime === 0) {
+      lastRealTime = originalPerformanceNow();
+      virtualTime = lastRealTime;
+    }
+
+    // Initialize Date.now tracking (if not already set)
+    if (lastRealDateNow === 0) {
+      lastRealDateNow = originalDateNow();
+      virtualDateNow = lastRealDateNow;
+    }
+
+    // Check if already installed globally (another extension instance)
+    if (window.__slowmoInstalled) {
+      isInstalled = true;
+      return;
+    }
+    window.__slowmoInstalled = true;
 
     const patchedRAF = (callback) => {
       return originalRAF((realTimestamp) => {
@@ -158,6 +211,25 @@
     }
 
     performance.now = () => getVirtualTime(originalPerformanceNow());
+    // Patch Date.now for libraries like Motion/Framer Motion
+    Date.now = () => getVirtualDateNow(originalDateNow());
+
+    // Patch setTimeout/setInterval - scale delays by inverse of speed
+    originalSetTimeout = window.setTimeout.bind(window);
+    originalSetInterval = window.setInterval.bind(window);
+
+    window.setTimeout = (callback, delay, ...args) => {
+      const effectiveSpeed = currentSpeed || 0.0001;
+      const scaledDelay = (delay ?? 0) / effectiveSpeed;
+      return originalSetTimeout(callback, scaledDelay, ...args);
+    };
+
+    window.setInterval = (callback, delay, ...args) => {
+      const effectiveSpeed = currentSpeed || 0.0001;
+      const scaledDelay = (delay ?? 0) / effectiveSpeed;
+      return originalSetInterval(callback, scaledDelay, ...args);
+    };
+
     originalRAF(pollAnimations);
     isInstalled = true;
   }
@@ -167,10 +239,16 @@
     const realNow = originalPerformanceNow();
     virtualTime = getVirtualTime(realNow);
     lastRealTime = realNow;
+    // Checkpoint Date.now
+    const realDateNowValue = originalDateNow();
+    virtualDateNow = getVirtualDateNow(realDateNowValue);
+    lastRealDateNow = realDateNowValue;
+
     currentSpeed = speed;
     isPaused = speed === 0;
     if (isPaused) {
       pauseTime = virtualTime;
+      pauseDateNow = virtualDateNow;
     }
     updateWebAnimations();
     updateMediaElements();
@@ -601,20 +679,12 @@
   // Expose slowmo function globally for programmatic control
   // This allows pages and tests to call window.slowmo(0.5)
   window.slowmo = function(speed) {
-    if (isTopFrame) {
-      uiSpeed = speed;
-      uiPaused = speed === 0;
-      setSpeed(speed);
-      saveState();
-      updateUI();
-    } else {
-      setSpeed(speed);
-    }
+    setSpeed(speed);
   };
 
   // Also expose helper methods
   window.slowmo.getSpeed = function() {
-    return isTopFrame ? uiSpeed : currentSpeed;
+    return currentSpeed;
   };
 
   window.slowmo.pause = function() {
@@ -622,14 +692,7 @@
   };
 
   window.slowmo.play = function() {
-    if (isTopFrame) {
-      uiPaused = false;
-      setSpeed(uiSpeed || 1);
-      saveState();
-      updateUI();
-    } else {
-      setSpeed(currentSpeed || 1);
-    }
+    setSpeed(currentSpeed || 1);
   };
 
   // ============================================

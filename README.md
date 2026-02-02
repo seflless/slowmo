@@ -90,9 +90,11 @@ function App() {
 | Videos & Audio        | `playbackRate` property                      |
 | requestAnimationFrame | Patched timestamps                           |
 | performance.now()     | Returns virtual time                         |
+| Date.now()            | Returns virtual epoch time                   |
+| setTimeout/setInterval| Scaled delays                                |
 | GSAP                  | `globalTimeline.timeScale()` (auto-detected) |
 | Three.js              | Uses rAF, works automatically                |
-| Framer Motion         | Uses Web Animations API, works automatically |
+| Framer Motion/Motion  | Uses Date.now(), works automatically         |
 | Canvas animations     | Uses rAF, works automatically                |
 
 ## Animation Recreation (AI-Powered)
@@ -153,10 +155,10 @@ Set your API key via environment variable (`GEMINI_API_KEY`, `OPENAI_API_KEY`, o
 ## Limitations
 
 - **Frame-based animations** that don't use timestamps can't be smoothly slowed (they increment by a fixed amount each frame regardless of time)
-- **Libraries that cache time function references** before slowmo loads may not be affected
+- **Libraries that cache time function references** before slowmo loads may not be affected (the Chrome extension runs early to avoid this)
 - **Video/audio** have browser-imposed limits (~0.0625x to 16x in Chrome)
-- **iframes** won't be affected unless slowmo is also loaded inside them
-- **Web Workers & Worklets** run in separate threads with their own timing APIs that can't be patched from the main thread (audio worklets, paint worklets, animation worklets)
+- **iframes** won't be affected unless slowmo is also loaded inside them (the extension handles this automatically)
+- **Service Workers & Worklets** run in separate threads that can't be patched (audio worklets, paint worklets, animation worklets)
 - **WebGL shaders** with custom time uniforms need manual integration
 - **Server-synced animations** that rely on server timestamps rather than local time
 

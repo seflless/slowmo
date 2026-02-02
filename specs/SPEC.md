@@ -67,12 +67,15 @@ import { Slowmo } from 'slowmo/react';
 | Animation Type | How It's Controlled |
 |---------------|---------------------|
 | CSS Animations | Web Animations API `playbackRate` |
-| CSS Transitions | Inject `transition-duration` multiplier |
+| CSS Transitions | Web Animations API `playbackRate` |
 | Videos/Audio | `playbackRate` property |
-| requestAnimationFrame | Monkey-patch to scale time delta |
+| requestAnimationFrame | Monkey-patch to scale timestamps |
+| performance.now() | Returns virtual time |
+| Date.now() | Returns virtual epoch time |
+| setTimeout/setInterval | Scaled delays |
 | GSAP | `gsap.globalTimeline.timeScale()` (if available) |
 | Three.js | Uses rAF, so handled automatically |
-| Framer Motion | Uses Web Animations API, handled automatically |
+| Framer Motion/Motion | Uses Date.now(), handled automatically |
 
 ## Speed Limits
 

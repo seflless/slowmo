@@ -336,8 +336,14 @@
 
       .demos-grid {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(5, 1fr);
         gap: 1rem;
+      }
+
+      @media (max-width: 900px) {
+        .demos-grid {
+          grid-template-columns: repeat(3, 1fr);
+        }
       }
 
       @media (max-width: 768px) {
@@ -419,6 +425,11 @@
 
       .waa-box {
         background: linear-gradient(135deg, #4ade80 0%, #34d399 100%);
+      }
+
+      .motion-box {
+        background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
+        cursor: pointer;
       }
 
       .demo-visual video {
@@ -806,6 +817,16 @@
               <p>HTML5 video</p>
             </div>
           </div>
+
+          <div class="demo-card">
+            <div class="demo-visual">
+              <div class="anim-box motion-box" id="motion-box"></div>
+            </div>
+            <div class="demo-label">
+              <h3>Motion</h3>
+              <p>Hover to animate</p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -948,6 +969,25 @@ slowmo.<span class="function">getSpeed</span>()     <span class="comment">// cur
           easing: "ease-in-out",
         },
       );
+
+      // Motion library demo (hover animation)
+      const motionBox = document.getElementById("motion-box");
+      (async () => {
+        try {
+          const { animate } = await import("https://cdn.jsdelivr.net/npm/motion@12/+esm");
+
+          motionBox.addEventListener("mouseenter", () => {
+            animate(motionBox, { scale: [null, 1.1, 1.5] }, { duration: 0.5, ease: "easeOut" });
+          });
+
+          motionBox.addEventListener("mouseleave", () => {
+            animate(motionBox, { scale: 1 }, { duration: 0.3, ease: "easeOut" });
+          });
+        } catch (e) {
+          // Motion library failed to load, skip this demo
+          console.warn("Motion library not available:", e);
+        }
+      })();
     </script>
   </body>
 </html>
