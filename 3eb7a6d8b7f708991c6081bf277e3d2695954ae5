@@ -1,0 +1,23 @@
+.github/workflows/publish.yml
+  2d4f4c99d80b1bbd 1-101
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "3eb7a6d8b7f708991c6081bf277e3d2695954ae5",
+  "prompts": {
+    "2d4f4c99d80b1bbd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "afa26082-da88-479e-b399-e408eb9c700e",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Francois Laberge <francoislaberge@gmail.com>",
+      "messages": [],
+      "total_additions": 101,
+      "total_deletions": 0,
+      "accepted_lines": 101,
+      "overriden_lines": 0
+    }
+  }
+}
