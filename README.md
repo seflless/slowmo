@@ -52,6 +52,35 @@ Add `data-slowmo-exclude` to opt out specific elements:
 <div data-slowmo-exclude>This animation runs at normal speed</div>
 ```
 
+## Dial Component
+
+Visual UI control for slowmo speed - draggable, rotatable dial.
+
+### Vanilla JS
+
+```js
+import { setupDial, shutdownDial } from 'slowmo/dial';
+
+setupDial();      // Mount dial to body (fixed position, draggable)
+shutdownDial();   // Remove and cleanup
+```
+
+### React
+
+```jsx
+import { Slowmo } from 'slowmo/react';
+
+function App() {
+  return <Slowmo />;  // Handles lifecycle automatically
+}
+```
+
+**Dial Features:**
+- Center: Pause/play toggle
+- Middle ring: Drag to reposition
+- Outer edge: Rotate to change speed (uses Pointer Lock)
+- Position persists in localStorage
+
 ## What It Works With
 
 | Type                  | How                                          |

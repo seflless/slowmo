@@ -28,4 +28,22 @@ A tiny, universal slow-motion library for web animations.
 
 - `npm run dev` - Run demo page
 - `npm run build` - Build library
-- `npm test` - Run tests
+- `npm test` - Run unit tests
+- `npm run test:e2e` - Run E2E tests
+- `npm run test:all` - Run all tests
+- `npm run typecheck` - TypeScript check
+
+## Publishing
+
+- `npm run release:patch` - Bump patch version + publish
+- `npm run release:minor` - Bump minor version + publish
+- `npm run release:major` - Bump major version + publish
+
+## Package Exports
+
+| Import | Description |
+|--------|-------------|
+| `slowmo` | Core speed control API |
+| `slowmo/dial` | Vanilla JS dial component |
+| `slowmo/react` | React `<Slowmo />` component |
+| `slowmo/recreate` | AI animation recreation |

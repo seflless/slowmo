@@ -33,14 +33,19 @@ To reload after code changes:
 
 ```
 slowmo/
-├── src/           # Library source
-├── demo/          # Demo website
-├── extension/     # Chrome extension
-│   ├── manifest.json
-│   ├── content.js    # Injected script + UI
-│   ├── popup.html    # Extension popup
-│   └── icons/
-└── test/          # Tests
+├── src/
+│   ├── index.ts        # Core slowmo API
+│   ├── dial.ts         # Dial component internals
+│   ├── dial-api.ts     # Dial public API (setupDial/shutdownDial)
+│   ├── react.tsx       # React <Slowmo /> component
+│   ├── recreate.ts     # AI animation recreation
+│   └── cli/            # CLI tools
+├── demo/               # Demo website
+├── extension/          # Chrome extension
+├── tests/
+│   ├── unit/           # Vitest unit tests
+│   └── e2e/            # Playwright E2E tests
+└── specs/              # Feature specifications
 ```
 
 ## Running Tests
