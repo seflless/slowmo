@@ -7,6 +7,12 @@ export default defineConfig({
   build: {
     outDir: '../dist-demo',
     emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'demo/index.html'),
+        'privacy-policy': resolve(__dirname, 'demo/privacy-policy.html'),
+      },
+    },
   },
   resolve: {
     alias: {
