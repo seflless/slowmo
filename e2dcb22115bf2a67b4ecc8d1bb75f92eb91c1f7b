@@ -1,0 +1,37 @@
+specs/SPEC.md
+  4444a1ea4b7ad658 70,72-75,78
+extension/manifest.json
+  4444a1ea4b7ad658 24-26
+src/index.ts
+  4444a1ea4b7ad658 16-22,26,34-35,45-47,55-59,105-114,269-305,307-313,356-400,428-432,438
+tests/unit/setTimeout.test.ts
+  4444a1ea4b7ad658 1-40
+tests/fixtures/motion-test.html
+  4444a1ea4b7ad658 1-295
+README.md
+  4444a1ea4b7ad658 93-94,97,158,160-161
+demo/index.html
+  4444a1ea4b7ad658 339,343-346,430-434,820-829,972-975,990
+extension/content.js
+  4444a1ea4b7ad658 10,23-25,29-32,45-51,153-195,214-232,242-246,251
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.41",
+  "base_commit_sha": "e2dcb22115bf2a67b4ecc8d1bb75f92eb91c1f7b",
+  "prompts": {
+    "4444a1ea4b7ad658": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "54bb51a0-1955-4d10-ade4-b672e0b0581c",
+        "model": "<synthetic>"
+      },
+      "human_author": "Francois Laberge <francoislaberge@gmail.com>",
+      "messages": [],
+      "total_additions": 14,
+      "total_deletions": 12,
+      "accepted_lines": 581,
+      "overriden_lines": 0
+    }
+  }
+}
