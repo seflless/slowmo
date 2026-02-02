@@ -1,0 +1,25 @@
+vite.config.ts
+  27f6cfd70a10780e 19
+.github/workflows/publish.yml
+  27f6cfd70a10780e 99
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "59d4741192ea4573a95794d14ff073adf8f37207",
+  "prompts": {
+    "27f6cfd70a10780e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "da80bf96-ebec-4bbf-b90b-0b2b0f6eede8",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Francois Laberge <francoislaberge@gmail.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
