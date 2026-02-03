@@ -1,0 +1,27 @@
+extension/content.js
+  a231733ee3834ac6 10-28,480,510,523,526
+src/dial.ts
+  a231733ee3834ac6 11-28,282,315,318
+tests/unit/dial-api.test.ts
+  a231733ee3834ac6 3-14,30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "53572924ce4518679e9cca251aeeb411369e914b",
+  "prompts": {
+    "a231733ee3834ac6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dcf1e66f-6d74-47c1-87e4-6490bf8be734",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Francois Laberge <francoislaberge@gmail.com>",
+      "messages": [],
+      "total_additions": 58,
+      "total_deletions": 8,
+      "accepted_lines": 58,
+      "overriden_lines": 0
+    }
+  }
+}
