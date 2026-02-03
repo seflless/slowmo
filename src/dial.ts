@@ -7,6 +7,25 @@
  */
 
 // ============================================
+// TRUSTED TYPES-SAFE DOM HELPERS
+// ============================================
+// Some sites set CSP `require-trusted-types-for 'script'` which blocks
+// innerHTML. We use DOMParser instead to avoid these errors entirely.
+
+function safeSetHTML(el: Element, html: string): void {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  el.replaceChildren(...Array.from(doc.body.childNodes));
+}
+
+function safeSetSVGContent(el: Element, svgFragment: string): void {
+  const doc = new DOMParser().parseFromString(
+    `<svg xmlns="http://www.w3.org/2000/svg">${svgFragment}</svg>`,
+    'image/svg+xml',
+  );
+  el.replaceChildren(...Array.from(doc.documentElement.childNodes));
+}
+
+// ============================================
 // CONSTANTS
 // ============================================
 
@@ -296,7 +315,7 @@ export function createDial(options: DialOptions): HTMLElement {
     </svg>
   `;
 
-  container.innerHTML = svg;
+  safeSetHTML(container, svg);
 
   // Speed display overlay
   const speedDisplay = document.createElement('div');
@@ -329,10 +348,10 @@ export function createDial(options: DialOptions): HTMLElement {
   function updatePauseIcon() {
     const iconGroup = container.querySelector('.dial-pause-icon') as SVGGElement;
     if (iconGroup) {
-      iconGroup.innerHTML = isPaused
+      safeSetSVGContent(iconGroup, isPaused
         ? `<path d="M-4.5 -8.5L7.5 0L-4.5 8.5Z" fill="${COLOR_BRASS}" stroke="${COLOR_BRASS}" stroke-width="1.5" stroke-linejoin="round"/>`
         : `<line x1="-4.5" y1="-8" x2="-4.5" y2="8" stroke="${COLOR_BRASS}" stroke-width="3" stroke-linecap="round"/>
-           <line x1="5.5" y1="-8" x2="5.5" y2="8" stroke="${COLOR_BRASS}" stroke-width="3" stroke-linecap="round"/>`;
+           <line x1="5.5" y1="-8" x2="5.5" y2="8" stroke="${COLOR_BRASS}" stroke-width="3" stroke-linecap="round"/>`);
     }
   }
 
