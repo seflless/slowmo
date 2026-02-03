@@ -1,5 +1,17 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 
+// Mock DOMParser (needed since dial uses it instead of innerHTML for Trusted Types compat)
+const mockParsedElement = {
+  childNodes: [],
+};
+const mockParsedDoc = {
+  body: mockParsedElement,
+  documentElement: mockParsedElement,
+};
+vi.stubGlobal('DOMParser', class {
+  parseFromString() { return mockParsedDoc; }
+});
+
 // Mock DOM environment
 const mockBody = {
   appendChild: vi.fn(),
@@ -15,7 +27,7 @@ const mockElement = {
     cursor: '',
   },
   className: '',
-  innerHTML: '',
+  replaceChildren: vi.fn(),
   appendChild: vi.fn(),
   addEventListener: vi.fn(),
   removeEventListener: vi.fn(),

@@ -7,6 +7,25 @@
 (function() {
   'use strict';
 
+  // ============================================
+  // TRUSTED TYPES-SAFE DOM HELPERS
+  // ============================================
+  // Some sites set CSP `require-trusted-types-for 'script'` which blocks
+  // innerHTML. We use DOMParser instead to avoid these errors entirely.
+
+  function safeSetHTML(el, html) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    el.replaceChildren(...doc.body.childNodes);
+  }
+
+  function safeSetSVGContent(el, svgFragment) {
+    const doc = new DOMParser().parseFromString(
+      `<svg xmlns="http://www.w3.org/2000/svg">${svgFragment}</svg>`,
+      'image/svg+xml'
+    );
+    el.replaceChildren(...doc.documentElement.childNodes);
+  }
+
   // Avoid double injection (extension loaded twice)
   if (window.__slowmoExtensionLoaded) return;
   window.__slowmoExtensionLoaded = true;
@@ -458,7 +477,7 @@
       font-family: ui-monospace, 'SF Mono', Monaco, monospace;
     `;
 
-    root.innerHTML = `
+    safeSetHTML(root, `
       <svg viewBox="0 0 ${DIAL_SIZE} ${DIAL_SIZE}" style="width:100%;height:100%;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.5));">
         <!-- Background circle -->
         <circle cx="${DIAL_RADIUS}" cy="${DIAL_RADIUS}" r="${DIAL_RADIUS}" fill="${COLOR_BG}"/>
@@ -488,7 +507,7 @@
         pointer-events: none;
         white-space: nowrap;
       ">${dialPaused ? 'paused' : formatDialSpeed(angleToSpeed(dialAngle)) + 'x'}</div>
-    `;
+    `);
 
     document.body.appendChild(root);
 
@@ -501,10 +520,10 @@
     }
 
     function updatePauseIcon() {
-      pauseIcon.innerHTML = dialPaused
+      safeSetSVGContent(pauseIcon, dialPaused
         ? `<path d="M-4.5 -8.5L7.5 0L-4.5 8.5Z" fill="${COLOR_BRASS}" stroke="${COLOR_BRASS}" stroke-width="1.5" stroke-linejoin="round"/>`
         : `<line x1="-4.5" y1="-8" x2="-4.5" y2="8" stroke="${COLOR_BRASS}" stroke-width="3" stroke-linecap="round"/>
-           <line x1="5.5" y1="-8" x2="5.5" y2="8" stroke="${COLOR_BRASS}" stroke-width="3" stroke-linecap="round"/>`;
+           <line x1="5.5" y1="-8" x2="5.5" y2="8" stroke="${COLOR_BRASS}" stroke-width="3" stroke-linecap="round"/>`);
     }
 
     function updateSpeedDisplay() {
