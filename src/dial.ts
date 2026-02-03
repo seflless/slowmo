@@ -2,9 +2,8 @@
  * slowmo Rotary Dial Controller
  *
  * A draggable, rotatable dial for controlling playback speed.
- * - Center: Pause button
- * - Middle ring: Drag to reposition
- * - Outer edge: Rotate to change speed (uses Pointer Lock API)
+ * - Center: Click to pause/play, drag to reposition
+ * - Outer wheel: Drag to rotate and change speed (radial atan2-based)
  */
 
 // ============================================
@@ -35,8 +34,7 @@ const DIAL_RADIUS = DIAL_SIZE / 2;
 
 // Interaction zone radii (from center)
 const PAUSE_ZONE_RADIUS = 14;
-const DRAG_ZONE_RADIUS = 24;
-// Outer edge (r >= DRAG_ZONE_RADIUS) is rotation zone
+// Outer wheel: PAUSE_ZONE_RADIUS <= r <= DIAL_RADIUS
 
 // Speed range
 const MIN_SPEED = 1 / 60;  // ~0.0167 (1 frame per second at 60fps)
@@ -51,8 +49,11 @@ const MAX_ANGLE = 157.5;   // At speed 10 (down-right)
 const SNAP_SPEED_MIN = 0.92;
 const SNAP_SPEED_MAX = 1.08;
 
-// Rotation sensitivity (degrees per pixel of mouse movement)
-const ROTATION_SENSITIVITY = 0.5;
+// Delay before center zone shows move cursor hint (ms)
+const HOLD_DELAY_MS = 150;
+
+// Minimum drag distance to count as a drag (pixels)
+const MIN_DRAG_DISTANCE = 3;
 
 // localStorage key for position only (speed is NOT persisted)
 const POSITION_KEY = 'slowmo-dial-position';
@@ -146,6 +147,28 @@ function distanceFromCenter(x: number, y: number, rect: DOMRect): number {
   return Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
 }
 
+/**
+ * Calculate mouse angle relative to dial center (in degrees).
+ * 0° = straight up, positive = clockwise.
+ */
+function mouseAngle(x: number, y: number, rect: DOMRect): number {
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+  // atan2 gives angle from positive X axis, counter-clockwise
+  // We want 0° = up, positive = clockwise
+  const radians = Math.atan2(x - centerX, centerY - y);
+  return radians * (180 / Math.PI);
+}
+
+/**
+ * Normalize angle delta to [-180, 180] range to handle wraparound.
+ */
+function normalizeAngleDelta(delta: number): number {
+  if (delta > 180) delta -= 360;
+  if (delta < -180) delta += 360;
+  return delta;
+}
+
 // ============================================
 // DIAL CREATION
 // ============================================
@@ -163,9 +186,22 @@ export function createDial(options: DialOptions): HTMLElement {
   // State - always start at 1x, not persisted
   let currentAngle = speedToAngle(options.initialSpeed ?? 1);
   let isPaused = options.initialPaused ?? false;
-  let isDragging = false;
-  let isRotating = false;
-  let dragOffset = { x: 0, y: 0 };
+
+  // Interaction state
+  type Zone = 'center' | 'wheel' | null;
+  let mouseDownZone: Zone = null;
+  let hasDragged = false;
+  let holdDelayTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // For center zone dragging (reposition)
+  let dragStartRight = 0;
+  let dragStartBottom = 0;
+  let dragStartMouseX = 0;
+  let dragStartMouseY = 0;
+
+  // For wheel zone rotation
+  let startMouseAngle = 0;
+  let startDialAngle = 0;
 
   // Load saved position
   let position = { right: 20, bottom: 20 };
@@ -313,7 +349,7 @@ export function createDial(options: DialOptions): HTMLElement {
     const iconGroup = container.querySelector('.dial-pause-icon') as SVGGElement;
     if (iconGroup) {
       safeSetSVGContent(iconGroup, isPaused
-        ? `<path d="-4.5 -8.5L7.5 0L-4.5 8.5Z" fill="${COLOR_BRASS}" stroke="${COLOR_BRASS}" stroke-width="1.5" stroke-linejoin="round"/>`
+        ? `<path d="M-4.5 -8.5L7.5 0L-4.5 8.5Z" fill="${COLOR_BRASS}" stroke="${COLOR_BRASS}" stroke-width="1.5" stroke-linejoin="round"/>`
         : `<line x1="-4.5" y1="-8" x2="-4.5" y2="8" stroke="${COLOR_BRASS}" stroke-width="3" stroke-linecap="round"/>
            <line x1="5.5" y1="-8" x2="5.5" y2="8" stroke="${COLOR_BRASS}" stroke-width="3" stroke-linecap="round"/>`);
     }
@@ -336,13 +372,120 @@ export function createDial(options: DialOptions): HTMLElement {
   // EVENT HANDLERS
   // ============================================
 
+  function clearHoldTimer() {
+    if (holdDelayTimer !== null) {
+      clearTimeout(holdDelayTimer);
+      holdDelayTimer = null;
+    }
+  }
+
   function handleMouseDown(e: MouseEvent) {
     e.preventDefault();
     const rect = container.getBoundingClientRect();
     const dist = distanceFromCenter(e.clientX, e.clientY, rect);
 
     if (dist < PAUSE_ZONE_RADIUS) {
-      // Pause zone - toggle pause
+      // Center zone - could be click (pause/play) or drag (reposition)
+      mouseDownZone = 'center';
+      hasDragged = false;
+      dragStartMouseX = e.clientX;
+      dragStartMouseY = e.clientY;
+      dragStartRight = parseInt(container.style.right) || 0;
+      dragStartBottom = parseInt(container.style.bottom) || 0;
+
+      // Start timer to show move cursor hint if held
+      holdDelayTimer = setTimeout(() => {
+        if (mouseDownZone === 'center' && !hasDragged) {
+          container.style.cursor = 'move';
+        }
+      }, HOLD_DELAY_MS);
+    } else if (dist <= DIAL_RADIUS) {
+      // Outer wheel zone - rotation
+      mouseDownZone = 'wheel';
+      startMouseAngle = mouseAngle(e.clientX, e.clientY, rect);
+      startDialAngle = currentAngle;
+      // Hide cursor so user can see the triangle indicator while rotating
+      document.body.style.cursor = 'none';
+    }
+  }
+
+  function handleMouseMove(e: MouseEvent) {
+    const rect = container.getBoundingClientRect();
+
+    if (mouseDownZone === 'center') {
+      // Check if moved enough to count as drag
+      const dx = e.clientX - dragStartMouseX;
+      const dy = e.clientY - dragStartMouseY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance > MIN_DRAG_DISTANCE) {
+        hasDragged = true;
+        clearHoldTimer();
+        document.body.style.cursor = 'move';
+
+        // Reposition dial: move by the same delta as the mouse
+        // Mouse moved by (dx, dy), so dial should move by same amount
+        // Since we use right/bottom positioning, moving right decreases 'right', moving down decreases 'bottom'
+        const right = dragStartRight - dx;
+        const bottom = dragStartBottom - dy;
+
+        // Clamp to viewport
+        container.style.right = Math.max(0, Math.min(right, window.innerWidth - DIAL_SIZE)) + 'px';
+        container.style.bottom = Math.max(0, Math.min(bottom, window.innerHeight - DIAL_SIZE)) + 'px';
+      }
+    } else if (mouseDownZone === 'wheel') {
+      // Rotate dial based on mouse angle
+      const currentMouseAngle = mouseAngle(e.clientX, e.clientY, rect);
+
+      // Check if mouse is in the "dead zone" at the bottom (beyond the dial's limits)
+      // Dead zone: angles beyond ±157.5° (within 22.5° of straight down)
+      const inDeadZone = Math.abs(currentMouseAngle) > MAX_ANGLE;
+
+      if (inDeadZone) {
+        // When in dead zone, clamp to the nearest limit based on which side we're on
+        // and reset references to prevent jumps when exiting the dead zone
+        const clampedMouseAngle = currentMouseAngle > 0 ? MAX_ANGLE : MIN_ANGLE;
+        currentAngle = clampedMouseAngle;
+        startMouseAngle = currentMouseAngle;
+        startDialAngle = currentAngle;
+      } else {
+        const delta = normalizeAngleDelta(currentMouseAngle - startMouseAngle);
+        const newAngle = startDialAngle + delta;
+        const clampedAngle = clampAngle(newAngle);
+
+        // If we hit a limit, reset the start reference so we "stick" at the limit
+        if (clampedAngle !== newAngle) {
+          startMouseAngle = currentMouseAngle;
+          startDialAngle = clampedAngle;
+        }
+
+        currentAngle = clampedAngle;
+      }
+
+      updateNotch();
+      updateSpeedDisplay();
+
+      if (!isPaused) {
+        onSpeedChange(angleToSpeed(currentAngle));
+      }
+    } else {
+      // Not dragging - update hover cursor
+      const dist = distanceFromCenter(e.clientX, e.clientY, rect);
+      if (dist < PAUSE_ZONE_RADIUS) {
+        container.style.cursor = 'pointer';
+      } else if (dist <= DIAL_RADIUS) {
+        container.style.cursor = 'grab';
+      } else {
+        container.style.cursor = '';
+      }
+    }
+  }
+
+  function handleMouseUp() {
+    clearHoldTimer();
+
+    if (mouseDownZone === 'center' && !hasDragged) {
+      // Quick click in center - toggle pause/play
       isPaused = !isPaused;
       updatePauseIcon();
       updateSpeedDisplay();
@@ -352,64 +495,32 @@ export function createDial(options: DialOptions): HTMLElement {
       } else {
         onSpeedChange(0);
       }
-    } else if (dist < DRAG_ZONE_RADIUS) {
-      // Drag zone - start repositioning
-      isDragging = true;
-      dragOffset.x = e.clientX - rect.left;
-      dragOffset.y = e.clientY - rect.top;
-      container.style.cursor = 'grabbing';
-    } else {
-      // Rotation zone - start rotating with pointer lock
-      isRotating = true;
-      container.requestPointerLock();
     }
-  }
 
-  function handleMouseMove(e: MouseEvent) {
-    if (isDragging) {
-      const x = e.clientX - dragOffset.x;
-      const y = e.clientY - dragOffset.y;
-      const right = window.innerWidth - x - DIAL_SIZE;
-      const bottom = window.innerHeight - y - DIAL_SIZE;
-
-      // Clamp to viewport
-      container.style.right = Math.max(0, Math.min(right, window.innerWidth - DIAL_SIZE)) + 'px';
-      container.style.bottom = Math.max(0, Math.min(bottom, window.innerHeight - DIAL_SIZE)) + 'px';
-    } else if (isRotating && document.pointerLockElement === container) {
-      // Use movementX for rotation (horizontal drag = rotate)
-      currentAngle = clampAngle(currentAngle + e.movementX * ROTATION_SENSITIVITY);
-      updateNotch();
-      updateSpeedDisplay();
-
-      if (!isPaused) {
-        onSpeedChange(angleToSpeed(currentAngle));
-      }
-    }
-  }
-
-  function handleMouseUp() {
-    if (isDragging) {
-      isDragging = false;
-      container.style.cursor = '';
+    if (mouseDownZone === 'center' && hasDragged) {
       savePosition();
     }
-    if (isRotating) {
-      isRotating = false;
-      document.exitPointerLock();
-    }
+
+    // Reset state
+    mouseDownZone = null;
+    hasDragged = false;
+    document.body.style.cursor = '';
+    container.style.cursor = '';
   }
 
-  function handlePointerLockChange() {
-    if (document.pointerLockElement !== container && isRotating) {
-      isRotating = false;
+  function handleMouseLeave() {
+    // Reset cursor when mouse leaves dial (only if not dragging)
+    if (mouseDownZone === null) {
+      container.style.cursor = '';
     }
   }
 
   // Attach events
   container.addEventListener('mousedown', handleMouseDown);
+  container.addEventListener('mousemove', handleMouseMove);
+  container.addEventListener('mouseleave', handleMouseLeave);
   document.addEventListener('mousemove', handleMouseMove);
   document.addEventListener('mouseup', handleMouseUp);
-  document.addEventListener('pointerlockchange', handlePointerLockChange);
 
   // Initial speed callback
   if (!isPaused) {
@@ -418,10 +529,12 @@ export function createDial(options: DialOptions): HTMLElement {
 
   // Cleanup function (can be called when removing dial)
   (container as any).destroy = () => {
+    clearHoldTimer();
     container.removeEventListener('mousedown', handleMouseDown);
+    container.removeEventListener('mousemove', handleMouseMove);
+    container.removeEventListener('mouseleave', handleMouseLeave);
     document.removeEventListener('mousemove', handleMouseMove);
     document.removeEventListener('mouseup', handleMouseUp);
-    document.removeEventListener('pointerlockchange', handlePointerLockChange);
   };
 
   return container;
