@@ -3,7 +3,7 @@
  *
  * A draggable, rotatable dial for controlling playback speed.
  * - Center: Click to pause/play, drag to reposition
- * - Outer wheel: Drag to rotate and change speed (radial atan2-based)
+ * - Outer wheel: Drag left/right to rotate and change speed
  */
 
 // ============================================
@@ -36,13 +36,13 @@ const DIAL_RADIUS = DIAL_SIZE / 2;
 const PAUSE_ZONE_RADIUS = 14;
 // Outer wheel: PAUSE_ZONE_RADIUS <= r <= DIAL_RADIUS
 
-// Speed range
-const MIN_SPEED = 1 / 60;  // ~0.0167 (1 frame per second at 60fps)
-const MAX_SPEED = 10;
+// Speed range (symmetric: 1/10x to 10x)
+const MIN_SPEED = 0.1;  // 1/10x
+const MAX_SPEED = 10;   // 10x
 
 // Rotation range: symmetric visual limits, 1x at center (0°)
 // Both sides stop 22.5° from straight down
-const MIN_ANGLE = -157.5;  // At speed 1/60 (down-left)
+const MIN_ANGLE = -157.5;  // At speed 1/10 (down-left)
 const MAX_ANGLE = 157.5;   // At speed 10 (down-right)
 
 // Snap to 1x within this range
@@ -55,8 +55,9 @@ const HOLD_DELAY_MS = 150;
 // Minimum drag distance to count as a drag (pixels)
 const MIN_DRAG_DISTANCE = 3;
 
-// localStorage key for position only (speed is NOT persisted)
+// localStorage keys
 const POSITION_KEY = 'slowmo-dial-position';
+const SPEED_KEY = 'slowmo-dial-speed';
 
 // Colors
 const COLOR_BG = '#2A2A2A';
@@ -115,21 +116,6 @@ function speedToAngle(speed: number): number {
   }
 }
 
-/**
- * Format speed for display.
- */
-function formatSpeed(speed: number): string {
-  if (speed >= 10) return '10';
-  if (speed >= 1) {
-    const formatted = speed.toFixed(1);
-    return formatted.endsWith('.0') ? formatted.slice(0, -2) : formatted;
-  }
-  if (speed >= 0.1) {
-    return speed.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
-  }
-  // Very slow speeds
-  return speed.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
-}
 
 /**
  * Clamp angle to valid range.
@@ -147,27 +133,6 @@ function distanceFromCenter(x: number, y: number, rect: DOMRect): number {
   return Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
 }
 
-/**
- * Calculate mouse angle relative to dial center (in degrees).
- * 0° = straight up, positive = clockwise.
- */
-function mouseAngle(x: number, y: number, rect: DOMRect): number {
-  const centerX = rect.left + rect.width / 2;
-  const centerY = rect.top + rect.height / 2;
-  // atan2 gives angle from positive X axis, counter-clockwise
-  // We want 0° = up, positive = clockwise
-  const radians = Math.atan2(x - centerX, centerY - y);
-  return radians * (180 / Math.PI);
-}
-
-/**
- * Normalize angle delta to [-180, 180] range to handle wraparound.
- */
-function normalizeAngleDelta(delta: number): number {
-  if (delta > 180) delta -= 360;
-  if (delta < -180) delta += 360;
-  return delta;
-}
 
 // ============================================
 // DIAL CREATION
@@ -183,8 +148,20 @@ export interface DialOptions {
 export function createDial(options: DialOptions): HTMLElement {
   const { onSpeedChange, onPauseToggle } = options;
 
-  // State - always start at 1x, not persisted
-  let currentAngle = speedToAngle(options.initialSpeed ?? 1);
+  // Load saved speed or use initial/default
+  let savedSpeed = options.initialSpeed ?? 1;
+  try {
+    const stored = localStorage.getItem(SPEED_KEY);
+    if (stored) {
+      const parsed = parseFloat(stored);
+      if (!isNaN(parsed) && parsed >= MIN_SPEED && parsed <= MAX_SPEED) {
+        savedSpeed = parsed;
+      }
+    }
+  } catch {}
+
+  // State
+  let currentAngle = speedToAngle(savedSpeed);
   let isPaused = options.initialPaused ?? false;
 
   // Interaction state
@@ -199,9 +176,8 @@ export function createDial(options: DialOptions): HTMLElement {
   let dragStartMouseX = 0;
   let dragStartMouseY = 0;
 
-  // For wheel zone rotation
-  let startMouseAngle = 0;
-  let startDialAngle = 0;
+  // Rotation sensitivity (degrees per pixel of horizontal movement)
+  const ROTATION_SENSITIVITY = 0.75;
 
   // Load saved position
   let position = { right: 20, bottom: 20 };
@@ -317,7 +293,7 @@ export function createDial(options: DialOptions): HTMLElement {
 
   safeSetHTML(container, svg);
 
-  // Speed display overlay
+  // Speed display overlay - editable
   const speedDisplay = document.createElement('div');
   speedDisplay.className = 'dial-speed';
   speedDisplay.style.cssText = `
@@ -328,11 +304,115 @@ export function createDial(options: DialOptions): HTMLElement {
     font-size: 11px;
     font-weight: 600;
     color: #a8a29e;
-    pointer-events: none;
     white-space: nowrap;
+    display: flex;
+    align-items: center;
   `;
-  speedDisplay.textContent = isPaused ? 'paused' : formatSpeed(angleToSpeed(currentAngle)) + 'x';
+
+  // The editable number part
+  const speedInput = document.createElement('input');
+  speedInput.type = 'text';
+  speedInput.className = 'dial-speed-input';
+  speedInput.style.cssText = `
+    background: transparent;
+    border: none;
+    outline: none;
+    color: inherit;
+    font: inherit;
+    width: 2.5em;
+    text-align: right;
+    padding: 0;
+    margin: 0;
+  `;
+
+  // The 'x' suffix (static)
+  const speedSuffix = document.createElement('span');
+  speedSuffix.textContent = 'x';
+  speedSuffix.className = 'dial-speed-suffix';
+
+  speedDisplay.appendChild(speedInput);
+  speedDisplay.appendChild(speedSuffix);
   container.appendChild(speedDisplay);
+
+  // Track if we're editing
+  let isEditing = false;
+  let editValueBeforeEdit = '';
+
+  function formatSpeedNumber(speed: number): string {
+    if (speed >= 10) return '10';
+    if (speed <= 0.1) return '0.1';
+    return speed.toFixed(1);
+  }
+
+  function updateSpeedInputDisplay() {
+    if (!isEditing) {
+      if (isPaused) {
+        speedInput.value = 'paused';
+        speedSuffix.style.display = 'none';
+      } else {
+        speedInput.value = formatSpeedNumber(angleToSpeed(currentAngle));
+        speedSuffix.style.display = '';
+      }
+    }
+  }
+
+  // Initialize display
+  updateSpeedInputDisplay();
+
+  // Speed input event handlers
+  speedInput.addEventListener('focus', () => {
+    if (isPaused) return; // Don't allow editing when paused
+    isEditing = true;
+    editValueBeforeEdit = speedInput.value;
+    speedInput.select();
+  });
+
+  speedInput.addEventListener('blur', () => {
+    if (!isEditing) return;
+    commitSpeedEdit();
+  });
+
+  speedInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commitSpeedEdit();
+      speedInput.blur();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelSpeedEdit();
+      speedInput.blur();
+    }
+  });
+
+  function commitSpeedEdit() {
+    if (!isEditing) return;
+    isEditing = false;
+
+    const value = parseFloat(speedInput.value);
+    if (!isNaN(value)) {
+      // Clamp to valid range
+      const clampedSpeed = Math.max(MIN_SPEED, Math.min(MAX_SPEED, value));
+      currentAngle = speedToAngle(clampedSpeed);
+      updateNotch();
+      saveSpeed();
+      if (!isPaused) {
+        onSpeedChange(clampedSpeed);
+      }
+    }
+    updateSpeedInputDisplay();
+  }
+
+  function cancelSpeedEdit() {
+    isEditing = false;
+    speedInput.value = editValueBeforeEdit;
+    updateSpeedInputDisplay();
+  }
+
+  function saveSpeed() {
+    try {
+      localStorage.setItem(SPEED_KEY, String(angleToSpeed(currentAngle)));
+    } catch {}
+  }
 
   // ============================================
   // UPDATE FUNCTIONS
@@ -356,7 +436,7 @@ export function createDial(options: DialOptions): HTMLElement {
   }
 
   function updateSpeedDisplay() {
-    speedDisplay.textContent = isPaused ? 'paused' : formatSpeed(angleToSpeed(currentAngle)) + 'x';
+    updateSpeedInputDisplay();
   }
 
   function savePosition() {
@@ -402,10 +482,8 @@ export function createDial(options: DialOptions): HTMLElement {
     } else if (dist <= DIAL_RADIUS) {
       // Outer wheel zone - rotation
       mouseDownZone = 'wheel';
-      startMouseAngle = mouseAngle(e.clientX, e.clientY, rect);
-      startDialAngle = currentAngle;
-      // Hide cursor so user can see the triangle indicator while rotating
-      document.body.style.cursor = 'none';
+      document.body.style.cursor = 'ew-resize';
+      container.style.cursor = 'ew-resize';
     }
   }
 
@@ -434,33 +512,11 @@ export function createDial(options: DialOptions): HTMLElement {
         container.style.bottom = Math.max(0, Math.min(bottom, window.innerHeight - DIAL_SIZE)) + 'px';
       }
     } else if (mouseDownZone === 'wheel') {
-      // Rotate dial based on mouse angle
-      const currentMouseAngle = mouseAngle(e.clientX, e.clientY, rect);
-
-      // Check if mouse is in the "dead zone" at the bottom (beyond the dial's limits)
-      // Dead zone: angles beyond ±157.5° (within 22.5° of straight down)
-      const inDeadZone = Math.abs(currentMouseAngle) > MAX_ANGLE;
-
-      if (inDeadZone) {
-        // When in dead zone, clamp to the nearest limit based on which side we're on
-        // and reset references to prevent jumps when exiting the dead zone
-        const clampedMouseAngle = currentMouseAngle > 0 ? MAX_ANGLE : MIN_ANGLE;
-        currentAngle = clampedMouseAngle;
-        startMouseAngle = currentMouseAngle;
-        startDialAngle = currentAngle;
-      } else {
-        const delta = normalizeAngleDelta(currentMouseAngle - startMouseAngle);
-        const newAngle = startDialAngle + delta;
-        const clampedAngle = clampAngle(newAngle);
-
-        // If we hit a limit, reset the start reference so we "stick" at the limit
-        if (clampedAngle !== newAngle) {
-          startMouseAngle = currentMouseAngle;
-          startDialAngle = clampedAngle;
-        }
-
-        currentAngle = clampedAngle;
-      }
+      // Rotate dial based on horizontal mouse movement (pointer lock)
+      // movementX: positive = right = clockwise, negative = left = counterclockwise
+      const delta = e.movementX * ROTATION_SENSITIVITY;
+      const newAngle = currentAngle + delta;
+      currentAngle = clampAngle(newAngle);
 
       updateNotch();
       updateSpeedDisplay();
@@ -474,7 +530,7 @@ export function createDial(options: DialOptions): HTMLElement {
       if (dist < PAUSE_ZONE_RADIUS) {
         container.style.cursor = 'pointer';
       } else if (dist <= DIAL_RADIUS) {
-        container.style.cursor = 'grab';
+        container.style.cursor = 'ew-resize';
       } else {
         container.style.cursor = '';
       }
@@ -499,6 +555,10 @@ export function createDial(options: DialOptions): HTMLElement {
 
     if (mouseDownZone === 'center' && hasDragged) {
       savePosition();
+    }
+
+    if (mouseDownZone === 'wheel') {
+      saveSpeed();
     }
 
     // Reset state

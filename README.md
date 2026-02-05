@@ -1,6 +1,8 @@
 # slowmo
 
-Slow down or speed up time on any web page.
+Slowmo enables you to slow down, pause, or speed up time on any web page. It works for any type of content from react apps to 3D games.
+
+Use it to debug animations, study cool animations made by others, make games easier or harder, or record cool videos products in action.
 
 ## Install
 
@@ -13,25 +15,25 @@ npm install slowmo
 ## Quick Start
 
 ```js
-import slowmo from "slowmo"
+import slowmo from "slowmo";
 
-slowmo(0.5) // half speed, that's it
+slowmo(0.5); // half speed, that's it
 ```
 
 ## Full API
 
 ```js
-import slowmo from "slowmo"
+import slowmo from "slowmo";
 
-slowmo(0.5)           // half speed
-slowmo(2)             // double speed
-slowmo(0)             // pause
-slowmo(1)             // normal
+slowmo(0.5); // half speed
+slowmo(2); // double speed
+slowmo(0); // pause
+slowmo(1); // normal
 
-slowmo.pause()        // pause all
-slowmo.play()         // resume
-slowmo.reset()        // back to 1×
-slowmo.getSpeed()     // current speed
+slowmo.pause(); // pause all
+slowmo.play(); // resume
+slowmo.reset(); // back to 1×
+slowmo.getSpeed(); // current speed
 ```
 
 ### Speed Guide
@@ -59,23 +61,24 @@ Visual UI control for slowmo speed - draggable, rotatable dial.
 ### Vanilla JS
 
 ```js
-import { setupDial, shutdownDial } from 'slowmo/dial';
+import { setupDial, shutdownDial } from "slowmo/dial";
 
-setupDial();      // Mount dial to body (fixed position, draggable)
-shutdownDial();   // Remove and cleanup
+setupDial(); // Mount dial to body (fixed position, draggable)
+shutdownDial(); // Remove and cleanup
 ```
 
 ### React
 
 ```jsx
-import { Slowmo } from 'slowmo/react';
+import { Slowmo } from "slowmo/react";
 
 function App() {
-  return <Slowmo />;  // Handles lifecycle automatically
+  return <Slowmo />; // Handles lifecycle automatically
 }
 ```
 
 **Dial Features:**
+
 - Center: Pause/play toggle
 - Middle ring: Drag to reposition
 - Outer edge: Rotate to change speed (uses Pointer Lock)
@@ -83,19 +86,19 @@ function App() {
 
 ## What It Works With
 
-| Type                  | How                                          |
-| --------------------- | -------------------------------------------- |
-| CSS Animations        | Web Animations API `playbackRate`            |
-| CSS Transitions       | Web Animations API `playbackRate`            |
-| Videos & Audio        | `playbackRate` property                      |
-| requestAnimationFrame | Patched timestamps                           |
-| performance.now()     | Returns virtual time                         |
-| Date.now()            | Returns virtual epoch time                   |
-| setTimeout/setInterval| Scaled delays                                |
-| GSAP                  | `globalTimeline.timeScale()` (auto-detected) |
-| Three.js              | Uses rAF, works automatically                |
-| Framer Motion/Motion  | Uses Date.now(), works automatically         |
-| Canvas animations     | Uses rAF, works automatically                |
+| Type                   | How                                          |
+| ---------------------- | -------------------------------------------- |
+| CSS Animations         | Web Animations API `playbackRate`            |
+| CSS Transitions        | Web Animations API `playbackRate`            |
+| Videos & Audio         | `playbackRate` property                      |
+| requestAnimationFrame  | Patched timestamps                           |
+| performance.now()      | Returns virtual time                         |
+| Date.now()             | Returns virtual epoch time                   |
+| setTimeout/setInterval | Scaled delays                                |
+| GSAP                   | `globalTimeline.timeScale()` (auto-detected) |
+| Three.js               | Uses rAF, works automatically                |
+| Framer Motion/Motion   | Uses Date.now(), works automatically         |
+| Canvas animations      | Uses rAF, works automatically                |
 
 ## Animation Recreation (AI-Powered)
 
@@ -117,32 +120,32 @@ npx slowmo-recreate ./video.mp4 -a --format json
 ### Programmatic Usage
 
 ```js
-import { recreate } from "slowmo/recreate"
+import { recreate } from "slowmo/recreate";
 
 const result = await recreate({
   source: "./animation.mp4",
   runtime: "framer-motion", // or 'gsap', 'css', 'remotion', etc.
   apiKey: process.env.GEMINI_API_KEY,
-})
+});
 
-console.log(result.code.code) // Generated animation code
-console.log(result.analysis) // AI analysis of the animation
+console.log(result.code.code); // Generated animation code
+console.log(result.analysis); // AI analysis of the animation
 ```
 
 ### Supported Runtimes
 
-| Runtime        | Description                         |
-| -------------- | ----------------------------------- |
-| `css`          | Native CSS @keyframes               |
-| `framer-motion`| React animation library             |
-| `gsap`         | Professional-grade animation        |
-| `remotion`     | React video framework               |
-| `motion-one`   | Lightweight animation library       |
-| `anime`        | Anime.js                            |
-| `three`        | Three.js 3D animations              |
-| `lottie`       | JSON animation format               |
-| `react-spring` | Spring-physics React animations     |
-| `popmotion`    | Functional animation library        |
+| Runtime         | Description                     |
+| --------------- | ------------------------------- |
+| `css`           | Native CSS @keyframes           |
+| `framer-motion` | React animation library         |
+| `gsap`          | Professional-grade animation    |
+| `remotion`      | React video framework           |
+| `motion-one`    | Lightweight animation library   |
+| `anime`         | Anime.js                        |
+| `three`         | Three.js 3D animations          |
+| `lottie`        | JSON animation format           |
+| `react-spring`  | Spring-physics React animations |
+| `popmotion`     | Functional animation library    |
 
 ### AI Backends
 
