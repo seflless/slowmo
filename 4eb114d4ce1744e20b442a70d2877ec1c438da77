@@ -1,0 +1,47 @@
+vite.extension.config.ts
+  9c38f24554462b58 1-22
+demo/index.html
+  9c38f24554462b58 724,795
+src/dial.ts
+  9c38f24554462b58 6,39-41,45,58,60,151-164,179-180,296,308-309,311-334,337-415,439,485-486,515-519,533,560-563
+  7154eff7149fe58c 5,37,52-56,136,166-178,432,455-461,468-479,481-484,491-509,514,520,527-532,534-535,541-553,555-557,559,564-568,571-574,580-581,592,594-595
+extension/content.js
+  9c38f24554462b58 257
+package.json
+  9c38f24554462b58 43-44
+src/extension/content.ts
+  9c38f24554462b58 1-51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.41",
+  "base_commit_sha": "4eb114d4ce1744e20b442a70d2877ec1c438da77",
+  "prompts": {
+    "7154eff7149fe58c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a88bb464-ddf7-47d7-9585-1b11fd9becb0",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Francois Laberge <francoislaberge@gmail.com>",
+      "messages": [],
+      "total_additions": 193,
+      "total_deletions": 80,
+      "accepted_lines": 105,
+      "overriden_lines": 0
+    },
+    "9c38f24554462b58": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "861da1e3-1e3b-470e-b5bd-d81641c5195f",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Francois Laberge <francoislaberge@gmail.com>",
+      "messages": [],
+      "total_additions": 336,
+      "total_deletions": 213,
+      "accepted_lines": 220,
+      "overriden_lines": 0
+    }
+  }
+}
