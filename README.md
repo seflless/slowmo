@@ -1,8 +1,8 @@
 # slowmo
 
-Slowmo enables you to slow down, pause, or speed up time on any web page. It works for any type of content from react apps to 3D games.
+Slow down, pause, or speed up time any web content.
 
-Use it to debug animations, study cool animations made by others, make games easier or harder, or record cool videos products in action.
+Debug animations, study cool demos, and make games easier or harder.
 
 ## Install
 
