@@ -218,6 +218,49 @@
         color: var(--accent);
       }
 
+      .install-options {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+      }
+
+      .install-options .install-box {
+        margin-bottom: 0;
+      }
+
+      .install-or {
+        color: var(--text-dim);
+        font-size: 0.875rem;
+      }
+
+      .extension-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: var(--bg-elevated);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 0.5rem 0.875rem;
+        font-family: var(--font-sans);
+        font-size: 0.875rem;
+        color: var(--text);
+        text-decoration: none;
+        transition: all 0.15s;
+      }
+
+      .extension-btn:hover {
+        background: var(--bg-hover);
+        border-color: var(--text-dim);
+      }
+
+      .extension-btn svg {
+        width: 18px;
+        height: 18px;
+      }
+
       /* Use cases */
       .use-cases {
         display: flex;
@@ -676,40 +719,65 @@
         </p>
 
         <h2 style="margin-bottom: 1rem">Quick Start</h2>
-        <div class="install-box">
-          <code>npm install slowmo</code>
-          <button
-            class="copy-btn"
-            onclick="copyInstall()"
-            title="Copy to clipboard"
+        <div class="install-options">
+          <div class="install-box">
+            <code>npm install slowmo</code>
+            <button
+              class="copy-btn"
+              onclick="copyInstall()"
+              title="Copy to clipboard"
+            >
+              <svg
+                id="copy-icon"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path
+                  d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"
+                ></path>
+              </svg>
+              <svg
+                id="check-icon"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                style="display: none"
+              >
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </button>
+          </div>
+          <span class="install-or">or</span>
+          <a
+            href="https://chromewebstore.google.com/detail/slowmo/mofjcfdoeioofnpbhipdjmldfokfndoa"
+            target="_blank"
+            rel="noopener"
+            class="extension-btn"
           >
+            Install the Chrome Extension
             <svg
-              id="copy-icon"
-              width="16"
-              height="16"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
               stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
             >
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
               <path
-                d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"
+                d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"
               ></path>
+              <polyline points="15 3 21 3 21 9"></polyline>
+              <line x1="10" y1="14" x2="21" y2="3"></line>
             </svg>
-            <svg
-              id="check-icon"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              style="display: none"
-            >
-              <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
-          </button>
+          </a>
         </div>
         <!-- Quick Start -->
         <div class="quick-start-inline" style="text-align: left">
