@@ -1,6 +1,6 @@
 # slowmo
 
-Slow down, pause, or speed up time any web content.
+Slow down, pause, or speed up time of any web content.
 
 Debug animations, study cool demos, and make games easier or harder.
 
