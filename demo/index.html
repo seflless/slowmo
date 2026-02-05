@@ -1,10 +1,13 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>slowmo</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'><circle cx='24' cy='24' r='21' fill='%23292524'/><circle cx='24' cy='24' r='17' fill='none' stroke='%23f59e0b' stroke-width='3'/><polyline points='24 12 24 24 33 30' fill='none' stroke='%23f59e0b' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'><circle cx='24' cy='24' r='21' fill='%23292524'/><circle cx='24' cy='24' r='17' fill='none' stroke='%23f59e0b' stroke-width='3'/><polyline points='24 12 24 24 33 30' fill='none' stroke='%23f59e0b' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/></svg>"
+    />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -105,7 +108,7 @@
       /* Hero */
       .hero {
         text-align: center;
-        margin-bottom: 4rem;
+        margin-bottom: 1rem;
         padding-top: 3rem;
       }
 
@@ -165,10 +168,13 @@
       .hero .tagline {
         font-size: 1.125rem;
         color: var(--text-muted);
-        margin-bottom: 2rem;
-        max-width: 400px;
+        margin-bottom: 0.5rem;
+        max-width: 600px;
         margin-left: auto;
         margin-right: auto;
+      }
+      .hero .tagline.secondary {
+        margin-bottom: 2rem;
       }
 
       /* Install box */
@@ -180,7 +186,7 @@
         border: 1px solid var(--border);
         border-radius: var(--radius);
         padding: 0.375rem 0.5rem 0.375rem 0.875rem;
-        margin-bottom: 2rem;
+        margin-bottom: 1rem;
       }
 
       .install-box code {
@@ -241,7 +247,7 @@
       /* Controller + Quick Start Section */
       .controller-section {
         position: relative;
-        padding: 2rem 0;
+        padding: 1rem 0;
         margin-bottom: 2rem;
       }
 
@@ -662,8 +668,14 @@
             </a>
           </div>
         </div>
-        <p class="tagline">Slow down or speed up time on any web page.</p>
+        <p class="tagline">
+          Slow down, pause, or speed up time any web content.
+        </p>
+        <p class="tagline secondary">
+          Debug animations, study cool demos, and make games easier or harder.
+        </p>
 
+        <h2 style="margin-bottom: 1rem">Quick Start</h2>
         <div class="install-box">
           <code>npm install slowmo</code>
           <button
@@ -699,62 +711,8 @@
             </svg>
           </button>
         </div>
-
-        <h3 class="section-title">Why?</h3>
-        <div class="use-cases">
-          <span class="use-case">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M12 20V10M18 20V4M6 20v-4"></path>
-            </svg>
-            Debug animations
-          </span>
-          <span class="use-case">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <circle cx="12" cy="12" r="10"></circle>
-              <path d="M12 16v-4M12 8h.01"></path>
-            </svg>
-            Study other people's animations
-          </span>
-          <span class="use-case">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <polygon points="5 3 19 12 5 21 5 3"></polygon>
-            </svg>
-            Speedrun UIs
-          </span>
-          <span class="use-case">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <rect x="2" y="6" width="20" height="12" rx="2"></rect>
-              <path d="M12 12h.01M17 12h.01M7 12h.01"></path>
-            </svg>
-            Make any game easier or harder
-          </span>
-        </div>
-      </section>
-
-      <!-- Quick Start -->
-      <section class="controller-section fade-up">
-        <h2>Quick Start</h2>
-        <div class="quick-start-inline">
+        <!-- Quick Start -->
+        <div class="quick-start-inline" style="text-align: left">
           <pre><code><span class="keyword">import</span> slowmo <span class="keyword">from</span> <span class="string">"slowmo"</span>
 
 <span class="function">slowmo</span>(<span class="number">0.5</span>)  <span class="comment">// half the speed of time</span></code></pre>
@@ -763,11 +721,13 @@
 
       <!-- Try It Controller -->
       <section class="controller-section fade-up">
-        <h2>Try It</h2>
+        <h2 style="margin-bottom: 1rem; text-transform: none; font-size: 1.5em; font-weight: bold; letter-spacing: normal; color: var(--text)">Try It</h2>
         <div class="controller-wrapper" id="dial-container">
           <!-- Dial will be inserted here -->
         </div>
-        <p class="dial-hint">Drag outer edge to change speed. Click center to pause.</p>
+        <p class="dial-hint">
+          Drag outer edge to change speed. Click center to pause.
+        </p>
       </section>
 
       <!-- Demos -->
@@ -832,7 +792,7 @@
 
       <!-- API -->
       <section class="api-section fade-up">
-        <h2>Full API</h2>
+        <h2 style="margin-bottom: 1rem; text-transform: none; font-size: 1.5em; font-weight: bold; letter-spacing: normal; color: var(--text)">Full API</h2>
         <div class="api-card api-full">
           <pre><code><span class="keyword">import</span> slowmo <span class="keyword">from</span> <span class="string">"slowmo"</span>
 
@@ -929,13 +889,13 @@ slowmo.<span class="function">getSpeed</span>()     <span class="comment">// cur
           // Dial handles pause internally via onSpeedChange(0)
         },
         initialSpeed: 1,
-        initialPaused: false
+        initialPaused: false,
       });
 
       // Override the dial's position to be inline instead of fixed
-      dial.style.position = 'relative';
-      dial.style.right = 'auto';
-      dial.style.bottom = 'auto';
+      dial.style.position = "relative";
+      dial.style.right = "auto";
+      dial.style.bottom = "auto";
       dialContainer.appendChild(dial);
 
       // requestAnimationFrame animation
@@ -967,21 +927,31 @@ slowmo.<span class="function">getSpeed</span>()     <span class="comment">// cur
           duration: 1500,
           iterations: Infinity,
           easing: "ease-in-out",
-        },
+        }
       );
 
       // Motion library demo (hover animation)
       const motionBox = document.getElementById("motion-box");
       (async () => {
         try {
-          const { animate } = await import("https://cdn.jsdelivr.net/npm/motion@12/+esm");
+          const { animate } = await import(
+            "https://cdn.jsdelivr.net/npm/motion@12/+esm"
+          );
 
           motionBox.addEventListener("mouseenter", () => {
-            animate(motionBox, { scale: [null, 1.1, 1.5] }, { duration: 0.5, ease: "easeOut" });
+            animate(
+              motionBox,
+              { scale: [null, 1.1, 1.5] },
+              { duration: 0.5, ease: "easeOut" }
+            );
           });
 
           motionBox.addEventListener("mouseleave", () => {
-            animate(motionBox, { scale: 1 }, { duration: 0.3, ease: "easeOut" });
+            animate(
+              motionBox,
+              { scale: 1 },
+              { duration: 0.3, ease: "easeOut" }
+            );
           });
         } catch (e) {
           // Motion library failed to load, skip this demo
