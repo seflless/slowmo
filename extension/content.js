@@ -570,13 +570,13 @@
         dragStartBottom = parseInt(container.style.bottom) || 0;
         holdDelayTimer = setTimeout(() => {
           if (mouseDownZone === "center" && !hasDragged) {
-            container.style.cursor = "move";
+            container.style.cursor = "none";
           }
         }, HOLD_DELAY_MS);
       } else if (dist <= DIAL_RADIUS) {
         mouseDownZone = "wheel";
-        document.body.style.cursor = "ew-resize";
-        container.style.cursor = "ew-resize";
+        document.body.style.cursor = "none";
+        container.style.cursor = "none";
       }
     }
     function handleMouseMove(e) {
@@ -588,7 +588,7 @@
         if (distance > MIN_DRAG_DISTANCE) {
           hasDragged = true;
           clearHoldTimer();
-          document.body.style.cursor = "move";
+          document.body.style.cursor = "none";
           const right = dragStartRight - dx;
           const bottom = dragStartBottom - dy;
           container.style.right = Math.max(0, Math.min(right, window.innerWidth - DIAL_SIZE)) + "px";
