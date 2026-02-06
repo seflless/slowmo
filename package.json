@@ -1,6 +1,6 @@
 {
   "name": "slowmo",
-  "version": "0.16.1",
+  "version": "0.16.2",
   "description": "Universal slow-motion control for web animations - CSS, videos, GSAP, Three.js, and more",
   "type": "module",
   "main": "./dist/slowmo.cjs",
