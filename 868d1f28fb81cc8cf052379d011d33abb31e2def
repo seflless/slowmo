@@ -1,0 +1,23 @@
+src/dial.ts
+  92d97ac415646e05 479,485-486,502
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "868d1f28fb81cc8cf052379d011d33abb31e2def",
+  "prompts": {
+    "92d97ac415646e05": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3bc6ad8d-b818-4aab-877d-b99922a59d24",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Francois Laberge <francoislaberge@gmail.com>",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 4,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}
