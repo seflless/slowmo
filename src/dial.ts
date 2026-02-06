@@ -476,14 +476,14 @@ export function createDial(options: DialOptions): HTMLElement {
       // Start timer to show move cursor hint if held
       holdDelayTimer = setTimeout(() => {
         if (mouseDownZone === 'center' && !hasDragged) {
-          container.style.cursor = 'move';
+          container.style.cursor = 'none';
         }
       }, HOLD_DELAY_MS);
     } else if (dist <= DIAL_RADIUS) {
       // Outer wheel zone - rotation
       mouseDownZone = 'wheel';
-      document.body.style.cursor = 'ew-resize';
-      container.style.cursor = 'ew-resize';
+      document.body.style.cursor = 'none';
+      container.style.cursor = 'none';
     }
   }
 
@@ -499,7 +499,7 @@ export function createDial(options: DialOptions): HTMLElement {
       if (distance > MIN_DRAG_DISTANCE) {
         hasDragged = true;
         clearHoldTimer();
-        document.body.style.cursor = 'move';
+        document.body.style.cursor = 'none';
 
         // Reposition dial: move by the same delta as the mouse
         // Mouse moved by (dx, dy), so dial should move by same amount
