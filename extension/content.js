@@ -621,18 +621,22 @@
     cursor: pointer;
     opacity: 0;
     pointer-events: auto;
-    transition: opacity 50ms ease;
+    transform: scale(0.9);
+    transform-origin: center;
+    transition:
+      opacity 50ms ease,
+      transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .toolbar-shell.hovered .close-button,
-  .close-button:hover,
   .close-button:focus-visible {
     opacity: 0.9;
   }
 
-  .close-button:hover,
+  .toolbar-shell.hovered .close-button:hover,
   .close-button:focus-visible {
     opacity: 1;
+    transform: scale(1);
   }
 
   .close-button svg {
