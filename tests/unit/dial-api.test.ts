@@ -64,6 +64,21 @@ describe('dial-api', () => {
       expect(isDialActive()).toBe(true);
     });
 
+    it('creates its icons without TrustedHTML parser sinks', () => {
+      const parserSpy = vi
+        .spyOn(DOMParser.prototype, 'parseFromString')
+        .mockImplementation(() => {
+          throw new TypeError("This document requires 'TrustedHTML' assignment.");
+        });
+
+      try {
+        expect(() => setupDial()).not.toThrow();
+        expect(document.querySelector('.slowmo-toolbar')).not.toBeNull();
+      } finally {
+        parserSpy.mockRestore();
+      }
+    });
+
     it('positions the scrub cursor in the viewport instead of the toolbar shadow root', () => {
       const toolbar = setupDial();
       const speedButton = toolbar?.shadowRoot?.querySelector<HTMLButtonElement>('.speed-half');

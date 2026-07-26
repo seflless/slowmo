@@ -684,15 +684,17 @@
     }
   }
 `;
-  function safeSetSVGContent(element, fragment) {
-    const documentFragment = new DOMParser().parseFromString(
-      `<svg xmlns="http://www.w3.org/2000/svg">${fragment}</svg>`,
-      "image/svg+xml"
-    );
-    element.replaceChildren(...Array.from(documentFragment.documentElement.childNodes));
+  const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
+  function appendSvgElement(parent, tagName, attributes) {
+    const element = document.createElementNS(SVG_NAMESPACE, tagName);
+    Object.entries(attributes).forEach(([name, value]) => {
+      element.setAttribute(name, value);
+    });
+    parent.appendChild(element);
+    return element;
   }
   function createIcon(name) {
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    const svg = document.createElementNS(SVG_NAMESPACE, "svg");
     svg.setAttribute("width", name === "close" ? "11" : "13");
     svg.setAttribute("height", name === "close" ? "11" : "13");
     svg.setAttribute("viewBox", "0 0 24 24");
@@ -703,11 +705,34 @@
     svg.setAttribute("stroke-linejoin", "round");
     svg.setAttribute("aria-hidden", "true");
     if (name === "pause") {
-      safeSetSVGContent(svg, '<rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/>');
+      appendSvgElement(svg, "rect", {
+        x: "6",
+        y: "4",
+        width: "4",
+        height: "16",
+        rx: "1",
+        fill: "currentColor",
+        stroke: "none"
+      });
+      appendSvgElement(svg, "rect", {
+        x: "14",
+        y: "4",
+        width: "4",
+        height: "16",
+        rx: "1",
+        fill: "currentColor",
+        stroke: "none"
+      });
     } else if (name === "play") {
-      safeSetSVGContent(svg, '<path d="M7 4.8v14.4L19 12 7 4.8Z" fill="currentColor" stroke="currentColor"/>');
+      appendSvgElement(svg, "path", {
+        d: "M7 4.8v14.4L19 12 7 4.8Z",
+        fill: "currentColor",
+        stroke: "currentColor"
+      });
     } else {
-      safeSetSVGContent(svg, '<path d="M18 6 6 18M6 6l12 12"/>');
+      appendSvgElement(svg, "path", {
+        d: "M18 6 6 18M6 6l12 12"
+      });
     }
     return svg;
   }
@@ -729,15 +754,23 @@
     pointer-events: none;
     transform: translate(-50%, -50%);
   `;
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    const svg = document.createElementNS(SVG_NAMESPACE, "svg");
     svg.setAttribute("width", "32");
     svg.setAttribute("height", "32");
     svg.setAttribute("viewBox", "0 0 32 32");
     svg.setAttribute("fill", "none");
-    safeSetSVGContent(svg, `
-    <path fill-rule="evenodd" clip-rule="evenodd" d="M19.763 12c.225.001.451.054.653.155l5.508 2.755c.498.249.808.75.808 1.307 0 .557-.31 1.058-.808 1.307l-5.508 2.755a1.46 1.46 0 0 1-2.114-1.307v-5.51c0-.4.158-.775.446-1.051A1.46 1.46 0 0 1 19.763 12ZM12.84 12.001c.806 0 1.462.655 1.462 1.462v5.509a1.462 1.462 0 0 1-2.115 1.307l-5.505-2.755a1.46 1.46 0 0 1 0-2.614l5.505-2.755c.203-.101.428-.154.653-.154Z" fill="white"/>
-    <path fill-rule="evenodd" clip-rule="evenodd" d="m25.477 15.805-5.508-2.755a.461.461 0 0 0-.667.413v5.509c0 .343.36.566.667.413l5.508-2.755a.461.461 0 0 0 0-.825ZM7.129 16.63l5.505 2.755a.462.462 0 0 0 .668-.413v-5.509a.462.462 0 0 0-.668-.413l-5.505 2.755a.461.461 0 0 0 0 .825Z" fill="black"/>
-  `);
+    appendSvgElement(svg, "path", {
+      "fill-rule": "evenodd",
+      "clip-rule": "evenodd",
+      d: "M19.763 12c.225.001.451.054.653.155l5.508 2.755c.498.249.808.75.808 1.307 0 .557-.31 1.058-.808 1.307l-5.508 2.755a1.46 1.46 0 0 1-2.114-1.307v-5.51c0-.4.158-.775.446-1.051A1.46 1.46 0 0 1 19.763 12ZM12.84 12.001c.806 0 1.462.655 1.462 1.462v5.509a1.462 1.462 0 0 1-2.115 1.307l-5.505-2.755a1.46 1.46 0 0 1 0-2.614l5.505-2.755c.203-.101.428-.154.653-.154Z",
+      fill: "white"
+    });
+    appendSvgElement(svg, "path", {
+      "fill-rule": "evenodd",
+      "clip-rule": "evenodd",
+      d: "m25.477 15.805-5.508-2.755a.461.461 0 0 0-.667.413v5.509c0 .343.36.566.667.413l5.508-2.755a.461.461 0 0 0 0-.825ZM7.129 16.63l5.505 2.755a.462.462 0 0 0 .668-.413v-5.509a.462.462 0 0 0-.668-.413l-5.505 2.755a.461.461 0 0 0 0 .825Z",
+      fill: "black"
+    });
     cursor.appendChild(svg);
     return cursor;
   }
