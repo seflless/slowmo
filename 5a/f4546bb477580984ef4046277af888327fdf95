@@ -1,0 +1,25 @@
+src/dial.ts
+  s_83c07eac7f189d::t_ed2c8ffbbaf9eb 490-502,506
+  s_83c07eac7f189d::t_d58e80d8830b33 518-535,537-541,543-545
+  s_83c07eac7f189d::t_ba6534999f31c6 569,574-585
+tests/unit/dial-api.test.ts
+  s_83c07eac7f189d::t_34b96d6aaac32b 67-81
+extension/content.js
+  s_83c07eac7f189d::t_c06c89ad7b3553 687-694,697,708-725,727-731,733-735,757,762-773
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "5af4546bb477580984ef4046277af888327fdf95",
+  "prompts": {},
+  "sessions": {
+    "s_83c07eac7f189d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f9f65-005c-7ef2-8c73-f995996ce9dc",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Francois Laberge <francoislaberge@gmail.com>"
+    }
+  }
+}
