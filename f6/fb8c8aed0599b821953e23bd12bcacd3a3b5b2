@@ -1,0 +1,22 @@
+src/dial.ts
+  s_83c07eac7f189d::t_7c882545e3973e 438
+  s_83c07eac7f189d::t_c1506b875e36f8 426-430,441
+extension/content.js
+  s_83c07eac7f189d::t_90b2daebc9fbd0 624-628,636,639
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "f6fb8c8aed0599b821953e23bd12bcacd3a3b5b2",
+  "prompts": {},
+  "sessions": {
+    "s_83c07eac7f189d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f9f65-005c-7ef2-8c73-f995996ce9dc",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Francois Laberge <francoislaberge@gmail.com>"
+    }
+  }
+}
