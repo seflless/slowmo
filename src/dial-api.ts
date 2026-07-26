@@ -1,27 +1,27 @@
 /**
- * slowmo Dial API
+ * slowmo Toolbar API
  *
- * Simple vanilla JS API for adding the slowmo dial to any page.
+ * Simple vanilla JS API for adding the slowmo toolbar to any page.
  *
  * @example
  * import { setupDial, shutdownDial } from 'slowmo/dial';
- * setupDial();     // Fixed position, mounted to body, draggable
- * shutdownDial();  // Removes dial and cleans up
+ * setupDial();     // Mounts the floating toolbar
+ * shutdownDial();  // Removes it and cleans up
  */
 
 import { createDial } from './dial';
 import { slowmo } from './index';
 
-// Singleton instance
+// Singleton instance. The legacy "dial" naming remains part of the public API.
 let dialInstance: HTMLElement | null = null;
 
 /**
- * Set up the slowmo dial component.
+ * Set up the slowmo toolbar component.
  *
- * Creates a draggable dial fixed to the viewport that controls slowmo speed.
- * Only one dial can exist at a time (singleton pattern).
+ * Creates a draggable toolbar fixed to the viewport that controls slowmo speed.
+ * Only one toolbar can exist at a time (singleton pattern).
  *
- * @returns The dial element, or null if already set up
+ * @returns The toolbar element, or null if already set up
  */
 export function setupDial(): HTMLElement | null {
   if (dialInstance) {
@@ -32,13 +32,19 @@ export function setupDial(): HTMLElement | null {
     return null;
   }
 
-  dialInstance = createDial({
+  const toolbar = createDial({
     onSpeedChange: (speed) => {
       slowmo(speed);
+    },
+    onClose: () => {
+      if (dialInstance === toolbar) {
+        dialInstance = null;
+      }
     },
     initialSpeed: slowmo.getSpeed() || 1,
     initialPaused: slowmo.getSpeed() === 0,
   });
+  dialInstance = toolbar;
 
   document.body.appendChild(dialInstance);
 
@@ -46,7 +52,7 @@ export function setupDial(): HTMLElement | null {
 }
 
 /**
- * Remove the dial and clean up event listeners.
+ * Remove the toolbar and clean up event listeners.
  */
 export function shutdownDial(): void {
   if (!dialInstance) {
@@ -64,7 +70,7 @@ export function shutdownDial(): void {
 }
 
 /**
- * Check if the dial is currently active.
+ * Check if the toolbar is currently active.
  */
 export function isDialActive(): boolean {
   return dialInstance !== null;

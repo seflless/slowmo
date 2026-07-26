@@ -25,9 +25,9 @@ slowmo.play();
 slowmo.reset();
 ```
 
-## Dial Component API
+## Toolbar Component API
 
-The dial provides a visual UI for controlling slowmo speed.
+The compact toolbar provides a visual UI for controlling Slowmo playback.
 
 ### Vanilla JS (`slowmo/dial`)
 
@@ -35,11 +35,11 @@ The dial provides a visual UI for controlling slowmo speed.
 import { setupDial, shutdownDial, isDialActive } from 'slowmo/dial';
 
 setupDial();         // Returns HTMLElement or null (if already active)
-shutdownDial();      // Removes dial, cleans up listeners
+shutdownDial();      // Removes the toolbar and cleans up listeners
 isDialActive();      // Returns boolean
 ```
 
-**Singleton:** Only one dial can exist. Second `setupDial()` returns null.
+**Singleton:** Only one toolbar can exist. A second `setupDial()` returns null.
 
 ### React (`slowmo/react`)
 
@@ -48,19 +48,19 @@ import { Slowmo } from 'slowmo/react';
 <Slowmo />  // Mount in app, auto-cleans on unmount
 ```
 
-### Dial Interaction Zones
+The legacy `slowmo/dial` import path and API names remain for compatibility.
 
-| Zone | Radius | Action |
-|------|--------|--------|
-| Center | 0-14px | Toggle pause/play |
-| Middle | 14-24px | Drag to reposition |
-| Outer | 24px+ | Rotate to change speed (Pointer Lock) |
+### Toolbar interactions
 
-### Speed Range
-
-- Min: 1/60 (~0.017x)
-- Max: 10x
-- Snaps to 1x when close (0.92-1.08 range)
+- Click the left side to pause or resume.
+- Drag the speed readout horizontally through 1/64×, 1/32×, 1/16×, 1/8×,
+  1/4×, 1/2×, 1×, 2×, 4×, 8×, 16×, 32×, and ∞.
+- Double-click the speed readout to reset to 1×.
+- Drag the divider to move the toolbar.
+- The toolbar docks to viewport edges and becomes vertical at the left or right.
+- Hover the toolbar to reveal its close control.
+- Close restores 1× and removes the toolbar until it is mounted or triggered again.
+- The toolbar follows the system light/dark color scheme.
 
 ## What It Controls
 
@@ -101,15 +101,14 @@ Elements with `data-slowmo-exclude` attribute are not affected.
 ## Demo Page Requirements
 
 The demo should showcase slowmo working with:
-1. CSS keyframe animation (spinner, bounce)
-2. CSS transition (hover effect)
-3. Video player
-4. Canvas animation (particles or similar)
-5. Three.js 3D scene (rotating cube)
-6. GSAP timeline
-7. Framer Motion spring animation
+1. CSS keyframe animation
+2. `requestAnimationFrame`
+3. Web Animations API
+4. A locally hosted, looping video
+5. A bundled Motion hover animation
 
-Include a nice UI with a speed slider and preset buttons (0.1x, 0.25x, 0.5x, 1x, 2x).
+The page uses the same draggable toolbar and speed presets as the package and
+Chrome extension.
 
 ## Chrome Extension
 
@@ -117,7 +116,7 @@ The Chrome extension provides page-wide control with full iframe support.
 
 ### Extension Goals
 
-1. **Single top-level control** - One speed slider controls the entire page
+1. **Single top-level control** - One toolbar controls the entire page
 2. **All frames synchronized** - Same speed applied to main page and all iframes
 3. **Nested iframe support** - Works with iframes within iframes (any depth)
 4. **Cross-origin iframes** - CodeSandbox, StackBlitz, embedded demos all work

@@ -1,7 +1,7 @@
 /**
  * slowmo React Components
  *
- * React wrapper for the slowmo dial controller.
+ * React wrapper for the slowmo toolbar controller.
  *
  * @example
  * import { Slowmo } from 'slowmo/react';
@@ -14,9 +14,9 @@ import { useEffect } from 'react';
 import { setupDial, shutdownDial } from './dial-api';
 
 /**
- * Slowmo dial component for React applications.
+ * Slowmo toolbar component for React applications.
  *
- * Renders the draggable slowmo dial that controls animation speed.
+ * Renders the draggable slowmo toolbar that controls animation speed.
  * Automatically handles mount/unmount lifecycle.
  *
  * @example

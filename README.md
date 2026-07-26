@@ -10,7 +10,7 @@ Debug animations, study cool demos, and make games easier or harder.
 npm install slowmo
 ```
 
-> **Chrome extension coming soon** - control any website's animations without writing code.
+Prefer a no-code setup? [Install the Chrome extension](https://chromewebstore.google.com/detail/slowmo/mofjcfdoeioofnpbhipdjmldfokfndoa).
 
 ## Quick Start
 
@@ -54,17 +54,17 @@ Add `data-slowmo-exclude` to opt out specific elements:
 <div data-slowmo-exclude>This animation runs at normal speed</div>
 ```
 
-## Dial Component
+## Toolbar Component
 
-Visual UI control for slowmo speed - draggable, rotatable dial.
+Compact visual control for Slowmo playback, designed to stay out of the way.
 
 ### Vanilla JS
 
 ```js
 import { setupDial, shutdownDial } from "slowmo/dial";
 
-setupDial(); // Mount dial to body (fixed position, draggable)
-shutdownDial(); // Remove and cleanup
+setupDial(); // Mount the toolbar to the page
+shutdownDial(); // Remove it and clean up
 ```
 
 ### React
@@ -77,12 +77,15 @@ function App() {
 }
 ```
 
-**Dial Features:**
+**Toolbar Features:**
 
-- Center: Pause/play toggle
-- Middle ring: Drag to reposition
-- Outer edge: Rotate to change speed (uses Pointer Lock)
-- Position persists in localStorage
+- Pause/play toggle
+- Drag the speed readout left or right through power-of-two presets from 1/64× to ∞
+- Double-click the speed readout to return to 1×
+- Drag the divider to reposition; the toolbar docks and rotates at viewport edges
+- Light and dark styles follow the system color scheme
+- Close removes the toolbar until it is mounted again
+- Position, orientation, and selected speed persist in localStorage
 
 ## What It Works With
 

@@ -306,15 +306,30 @@
 
       .controller-wrapper {
         display: flex;
+        min-height: 68px;
+        align-items: center;
         justify-content: center;
         margin-bottom: 1.5rem;
       }
 
-      .dial-hint {
-        text-align: center;
-        font-size: 0.75rem;
-        color: var(--text-dim);
-        margin-top: 0.5rem;
+      .toolbar-reopen {
+        padding: 0.55rem 0.8rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        background: var(--bg-elevated);
+        color: var(--text-muted);
+        font: 500 0.75rem var(--font-sans);
+        cursor: pointer;
+        transition:
+          color 150ms ease,
+          border-color 150ms ease,
+          background-color 150ms ease;
+      }
+
+      .toolbar-reopen:hover {
+        border-color: var(--text-dim);
+        background: var(--bg-hover);
+        color: var(--text);
       }
 
       /* Quick Start inline */
@@ -676,7 +691,7 @@
   <body>
     <div class="page">
       <!-- Hero -->
-      <section class="hero fade-up">
+      <section class="hero fade-up" data-slowmo-exclude>
         <div class="hero-title">
           <h1>slowmo</h1>
           <div class="hero-links">
@@ -788,7 +803,7 @@
       </section>
 
       <!-- Try It Controller -->
-      <section class="controller-section fade-up">
+      <section class="controller-section fade-up" data-slowmo-exclude>
         <h2
           style="
             margin-bottom: 1rem;
@@ -801,16 +816,15 @@
         >
           Try It
         </h2>
-        <div class="controller-wrapper" id="dial-container">
-          <!-- Dial will be inserted here -->
+        <div class="controller-wrapper" id="toolbar-container">
+          <button class="toolbar-reopen" id="toolbar-reopen" type="button" hidden>
+            Show toolbar
+          </button>
         </div>
-        <p class="dial-hint">
-          Drag outer edge to change speed. Click center to pause.
-        </p>
       </section>
 
       <!-- Demos -->
-      <section class="demos-section fade-up">
+      <section class="demos-section">
         <div class="demos-grid">
           <div class="demo-card">
             <div class="demo-visual">
@@ -846,7 +860,7 @@
             <div class="demo-visual">
               <video id="demo-video" autoplay muted loop playsinline>
                 <source
-                  src="https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+                  src="./assets/running-horse.mp4"
                   type="video/mp4"
                 />
               </video>
@@ -870,7 +884,7 @@
       </section>
 
       <!-- API -->
-      <section class="api-section fade-up">
+      <section class="api-section fade-up" data-slowmo-exclude>
         <h2
           style="
             margin-bottom: 1rem;
@@ -899,7 +913,7 @@ slowmo.<span class="function">getSpeed</span>()     <span class="comment">// cur
       </section>
 
       <!-- Credits -->
-      <section class="credits fade-up">
+      <section class="credits fade-up" data-slowmo-exclude>
         <p>
           Inspired by
           <a href="https://agentation.dev/" target="_blank" rel="noopener"
@@ -923,7 +937,7 @@ slowmo.<span class="function">getSpeed</span>()     <span class="comment">// cur
       </section>
 
       <!-- Footer -->
-      <footer class="footer fade-up">
+      <footer class="footer fade-up" data-slowmo-exclude>
         <div class="footer-links">
           <a href="https://github.com/seflless/slowmo">github</a>
           <a href="https://www.npmjs.com/package/slowmo">npm</a>
@@ -950,6 +964,7 @@ slowmo.<span class="function">getSpeed</span>()     <span class="comment">// cur
     <script type="module">
       import { slowmo } from "../src/index.ts";
       import { createDial } from "../src/dial.ts";
+      import { animate } from "motion";
 
       // Copy install command
       window.copyInstall = function () {
@@ -969,24 +984,42 @@ slowmo.<span class="function">getSpeed</span>()     <span class="comment">// cur
         }, 2000);
       };
 
-      // Create the dial controller (inline in the page, not floating)
-      const dialContainer = document.getElementById("dial-container");
-      const dial = createDial({
-        onSpeedChange: (speed) => {
-          slowmo(speed);
-        },
-        onPauseToggle: (paused) => {
-          // Dial handles pause internally via onSpeedChange(0)
-        },
-        initialSpeed: 1,
-        initialPaused: false,
-      });
+      // Mount the same toolbar used by the package and Chrome extension.
+      const toolbarContainer = document.getElementById("toolbar-container");
+      const toolbarReopen = document.getElementById("toolbar-reopen");
 
-      // Override the dial's position to be inline instead of fixed
-      dial.style.position = "relative";
-      dial.style.right = "auto";
-      dial.style.bottom = "auto";
-      dialContainer.appendChild(dial);
+      function mountToolbar() {
+        toolbarReopen.hidden = true;
+        const toolbar = createDial({
+          layout: "inline",
+          onSpeedChange: (speed) => {
+            slowmo(speed);
+          },
+          onClose: () => {
+            toolbarReopen.hidden = false;
+          },
+          initialSpeed: slowmo.getSpeed() || 1,
+          initialPaused: slowmo.getSpeed() === 0,
+        });
+        toolbarContainer.prepend(toolbar);
+      }
+
+      toolbarReopen.addEventListener("click", mountToolbar);
+      mountToolbar();
+
+      // Explicitly start the muted local demo once it can play. Some browser
+      // automation and power-saving modes do not honor the autoplay attribute.
+      const demoVideo = document.getElementById("demo-video");
+      const playDemoVideo = () => {
+        demoVideo.play().catch(() => {
+          // A user pause or browser autoplay policy may intentionally block it.
+        });
+      };
+      if (demoVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        playDemoVideo();
+      } else {
+        demoVideo.addEventListener("canplay", playDemoVideo, { once: true });
+      }
 
       // requestAnimationFrame animation
       const rafBox = document.getElementById("raf-box");
@@ -1020,34 +1053,24 @@ slowmo.<span class="function">getSpeed</span>()     <span class="comment">// cur
         }
       );
 
-      // Motion library demo (hover animation)
+      // Motion library demo (hover animation). Motion is bundled with the
+      // demo so this remains functional without a runtime CDN dependency.
       const motionBox = document.getElementById("motion-box");
-      (async () => {
-        try {
-          const { animate } = await import(
-            "https://cdn.jsdelivr.net/npm/motion@12/+esm"
-          );
+      motionBox.addEventListener("mouseenter", () => {
+        animate(
+          motionBox,
+          { scale: [null, 1.1, 1.5] },
+          { duration: 0.5, ease: "easeOut" }
+        );
+      });
 
-          motionBox.addEventListener("mouseenter", () => {
-            animate(
-              motionBox,
-              { scale: [null, 1.1, 1.5] },
-              { duration: 0.5, ease: "easeOut" }
-            );
-          });
-
-          motionBox.addEventListener("mouseleave", () => {
-            animate(
-              motionBox,
-              { scale: 1 },
-              { duration: 0.3, ease: "easeOut" }
-            );
-          });
-        } catch (e) {
-          // Motion library failed to load, skip this demo
-          console.warn("Motion library not available:", e);
-        }
-      })();
+      motionBox.addEventListener("mouseleave", () => {
+        animate(
+          motionBox,
+          { scale: 1 },
+          { duration: 0.3, ease: "easeOut" }
+        );
+      });
     </script>
   </body>
 </html>

@@ -113,6 +113,27 @@ function getVirtualDateNow(realDateNow: number): number {
 }
 
 /**
+ * Check the element and its composed-tree ancestors for the exclusion marker.
+ * Element.closest() stops at a shadow root, so explicitly continue from a
+ * shadow root to its host. This keeps Slowmo's own toolbar animations at
+ * real-time speed as well.
+ */
+function isSlowmoExcluded(element: Element): boolean {
+  let current: Element | null = element;
+
+  while (current) {
+    if (current.closest('[data-slowmo-exclude]')) return true;
+    const root = current.getRootNode?.();
+    current =
+      typeof ShadowRoot !== 'undefined' && root instanceof ShadowRoot
+        ? root.host
+        : null;
+  }
+
+  return false;
+}
+
+/**
  * Update all Web Animations API animations.
  *
  * This handles CSS @keyframes animations, CSS transitions, and
@@ -131,7 +152,7 @@ function updateWebAnimations(): void {
     // Skip excluded elements (opt-out mechanism)
     const effect = anim.effect as KeyframeEffect | null;
     if (effect?.target instanceof Element) {
-      if (effect.target.closest('[data-slowmo-exclude]')) continue;
+      if (isSlowmoExcluded(effect.target)) continue;
     }
 
     // Handle infinity speed - finish animations immediately
@@ -189,17 +210,8 @@ function updateWebAnimations(): void {
 function updateMediaElements(): void {
   const mediaElements = document.querySelectorAll('video, audio');
   mediaElements.forEach((el) => {
-    if (el.closest('[data-slowmo-exclude]')) return;
+    if (isSlowmoExcluded(el)) return;
     const media = el as HTMLMediaElement;
-
-    // Handle infinity speed - jump to end and pause
-    if (currentSpeed === Infinity) {
-      if (media.duration && isFinite(media.duration)) {
-        media.currentTime = media.duration;
-        media.pause();
-      }
-      return;
-    }
 
     let tracked = trackedMedia.get(media);
 
@@ -216,6 +228,19 @@ function updateMediaElements(): void {
       if (media.playbackRate !== tracked.applied && !isPaused) {
         tracked.original = media.playbackRate;
       }
+    }
+
+    // Handle infinity speed - jump to the end and remember whether Slowmo
+    // paused the media so a later finite speed can resume it.
+    if (currentSpeed === Infinity) {
+      if (media.duration && isFinite(media.duration)) {
+        media.currentTime = media.duration;
+        if (!media.paused) {
+          tracked.wasPaused = true;
+        }
+        media.pause();
+      }
+      return;
     }
 
     // Handle pause state

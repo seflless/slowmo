@@ -168,4 +168,23 @@ test.describe('Video playback rate control', () => {
     // This is the primary guarantee - currentTime behavior is secondary
     expect(result.isPaused).toBe(true);
   });
+
+  test('video resumes after leaving Infinity speed', async ({ page }) => {
+    await page.evaluate(async () => {
+      const video = document.getElementById('test-video') as HTMLVideoElement;
+      await video.play();
+    });
+
+    await page.evaluate(() => (window as any).slowmo(Infinity));
+    await expect.poll(() => page.evaluate(() => {
+      const video = document.getElementById('test-video') as HTMLVideoElement;
+      return video.paused;
+    })).toBe(true);
+
+    await page.evaluate(() => (window as any).slowmo(1));
+    await expect.poll(() => page.evaluate(() => {
+      const video = document.getElementById('test-video') as HTMLVideoElement;
+      return video.paused;
+    })).toBe(false);
+  });
 });
