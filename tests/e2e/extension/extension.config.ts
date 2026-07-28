@@ -11,7 +11,8 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: 0,
   workers: 1,
-  reporter: 'html',
+  reporter: 'list',
+  timeout: 30_000,
   use: {
     // Extensions require headed mode
     headless: false,
@@ -31,6 +32,18 @@ export default defineConfig({
       },
     },
   ],
-  // Note: Start the test server manually with `npm run dev` or
-  // `npx vite --config vite.test.config.ts` before running extension tests
+  webServer: [
+    {
+      command: 'vite --config vite.test.config.ts',
+      cwd: path.resolve(__dirname, '../../..'),
+      port: 5174,
+      reuseExistingServer: true,
+    },
+    {
+      command: 'vite --config vite.test.config.ts --port 5184',
+      cwd: path.resolve(__dirname, '../../..'),
+      port: 5184,
+      reuseExistingServer: false,
+    },
+  ],
 });

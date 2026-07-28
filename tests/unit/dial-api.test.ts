@@ -1,85 +1,31 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+// @vitest-environment jsdom
 
-// Mock DOMParser (needed since dial uses it instead of innerHTML for Trusted Types compat)
-const mockParsedElement = {
-  childNodes: [],
-};
-const mockParsedDoc = {
-  body: mockParsedElement,
-  documentElement: mockParsedElement,
-};
-vi.stubGlobal('DOMParser', class {
-  parseFromString() { return mockParsedDoc; }
-});
-
-// Mock DOM environment
-const mockBody = {
-  appendChild: vi.fn(),
-};
-
-const mockElement = {
-  remove: vi.fn(),
-  destroy: vi.fn(),
-  style: {
-    cssText: '',
-    right: '20px',
-    bottom: '20px',
-    cursor: '',
-  },
-  className: '',
-  replaceChildren: vi.fn(),
-  appendChild: vi.fn(),
-  addEventListener: vi.fn(),
-  removeEventListener: vi.fn(),
-  querySelector: vi.fn(() => null),
-  getBoundingClientRect: vi.fn(() => ({ left: 0, top: 0, width: 64, height: 64 })),
-  requestPointerLock: vi.fn(),
-};
-
-// Mock document
-vi.stubGlobal('document', {
-  body: mockBody,
-  createElement: vi.fn(() => ({ ...mockElement })),
-  addEventListener: vi.fn(),
-  removeEventListener: vi.fn(),
-  pointerLockElement: null,
-  exitPointerLock: vi.fn(),
-  getAnimations: vi.fn(() => []),
-  querySelectorAll: vi.fn(() => []),
-});
-
-// Mock window
-vi.stubGlobal('window', {
-  innerWidth: 1920,
-  innerHeight: 1080,
-  requestAnimationFrame: vi.fn((cb) => 1),
-  localStorage: {
-    getItem: vi.fn(() => null),
-    setItem: vi.fn(),
-  },
-});
-
-// Mock performance
-Object.defineProperty(global, 'performance', {
-  value: {
-    now: vi.fn(() => 0),
-  },
-  writable: true,
-});
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 describe('dial-api', () => {
   let setupDial: typeof import('../../src/dial-api').setupDial;
   let shutdownDial: typeof import('../../src/dial-api').shutdownDial;
   let isDialActive: typeof import('../../src/dial-api').isDialActive;
 
-  beforeEach(async () => {
-    // Reset mocks
-    vi.clearAllMocks();
-    mockBody.appendChild.mockClear();
-    mockElement.remove.mockClear();
+  beforeAll(async () => {
+    Object.defineProperty(window, 'requestAnimationFrame', {
+      configurable: true,
+      writable: true,
+      value: vi.fn(() => 1),
+    });
+    Object.defineProperty(document, 'getAnimations', {
+      configurable: true,
+      value: vi.fn(() => []),
+    });
+    Object.defineProperty(HTMLElement.prototype, 'requestPointerLock', {
+      configurable: true,
+      value: vi.fn(),
+    });
+    Object.defineProperty(document, 'exitPointerLock', {
+      configurable: true,
+      value: vi.fn(),
+    });
 
-    // Re-import to get fresh state (singleton reset)
-    vi.resetModules();
     const module = await import('../../src/dial-api');
     setupDial = module.setupDial;
     shutdownDial = module.shutdownDial;
@@ -87,63 +33,214 @@ describe('dial-api', () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    shutdownDial();
+    document.body.replaceChildren();
+    localStorage.clear();
+    vi.clearAllMocks();
   });
 
   describe('setupDial()', () => {
-    it('should create and append dial to body', () => {
+    it('creates and appends the toolbar to the body', () => {
       const result = setupDial();
+
       expect(result).not.toBeNull();
-      expect(mockBody.appendChild).toHaveBeenCalled();
+      expect(result?.className).toBe('slowmo-toolbar');
+      expect(result?.shadowRoot?.querySelector('[role="toolbar"]')).not.toBeNull();
+      expect(document.body.contains(result)).toBe(true);
     });
 
-    it('should return null on second call (singleton)', () => {
+    it('returns null on the second call', () => {
       const first = setupDial();
       const second = setupDial();
+
       expect(first).not.toBeNull();
       expect(second).toBeNull();
-      expect(mockBody.appendChild).toHaveBeenCalledTimes(1);
+      expect(document.querySelectorAll('.slowmo-toolbar')).toHaveLength(1);
     });
 
-    it('should mark dial as active', () => {
+    it('marks the toolbar as active', () => {
       expect(isDialActive()).toBe(false);
       setupDial();
       expect(isDialActive()).toBe(true);
+    });
+
+    it('creates its icons without TrustedHTML parser sinks', () => {
+      const parserSpy = vi
+        .spyOn(DOMParser.prototype, 'parseFromString')
+        .mockImplementation(() => {
+          throw new TypeError("This document requires 'TrustedHTML' assignment.");
+        });
+
+      try {
+        expect(() => setupDial()).not.toThrow();
+        expect(document.querySelector('.slowmo-toolbar')).not.toBeNull();
+      } finally {
+        parserSpy.mockRestore();
+      }
+    });
+
+    it('positions the scrub cursor in the viewport instead of the toolbar shadow root', () => {
+      const toolbar = setupDial();
+      const speedButton = toolbar?.shadowRoot?.querySelector<HTMLButtonElement>('.speed-half');
+
+      speedButton?.dispatchEvent(new MouseEvent('mousedown', {
+        bubbles: true,
+        button: 0,
+        clientX: 321,
+        clientY: 123,
+      }));
+
+      const cursor = document.querySelector<HTMLElement>('.slowmo-fake-cursor');
+      expect(cursor?.parentElement).toBe(document.documentElement);
+      expect(cursor?.style.left).toBe('321px');
+      expect(cursor?.style.top).toBe('123px');
+
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+      expect(document.querySelector('.slowmo-fake-cursor')).toBeNull();
+    });
+
+    it('scrubs through power-of-two speed presets', () => {
+      const toolbar = setupDial();
+      const speedButton = toolbar?.shadowRoot?.querySelector<HTMLButtonElement>('.speed-half');
+      const displayedSpeed = () => speedButton?.textContent;
+      const scrubOnePreset = (movementX: number) => {
+        const event = new MouseEvent('mousemove', { bubbles: true });
+        Object.defineProperty(event, 'movementX', { value: movementX });
+        document.dispatchEvent(event);
+      };
+
+      expect(displayedSpeed()).toBe('1×');
+      speedButton?.dispatchEvent(new MouseEvent('mousedown', {
+        bubbles: true,
+        button: 0,
+        clientX: 100,
+        clientY: 20,
+      }));
+
+      for (const expected of ['2×', '4×', '8×', '16×', '32×', '∞']) {
+        scrubOnePreset(18);
+        expect(displayedSpeed()).toBe(expected);
+      }
+
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    });
+
+    it('snaps back to the sticky 1x preset while scrubbing', () => {
+      const toolbar = setupDial();
+      const speedButton = toolbar?.shadowRoot
+        ?.querySelector<HTMLButtonElement>('.speed-half');
+      const move = (movementX: number) => {
+        const event = new MouseEvent('mousemove', { bubbles: true });
+        Object.defineProperty(event, 'movementX', { value: movementX });
+        document.dispatchEvent(event);
+      };
+
+      speedButton?.dispatchEvent(new MouseEvent('mousedown', {
+        bubbles: true,
+        button: 0,
+        clientX: 100,
+        clientY: 20,
+      }));
+      move(18);
+      expect(speedButton?.textContent).toBe('2×');
+      move(-9);
+      expect(speedButton?.textContent).toBe('1×');
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    });
+
+    it('shows elastic overscroll at the end of the preset range', () => {
+      const toolbar = setupDial();
+      const speedButton = toolbar?.shadowRoot
+        ?.querySelector<HTMLButtonElement>('.speed-half');
+
+      for (let index = 0; index < 6; index += 1) {
+        speedButton?.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'ArrowLeft',
+          bubbles: true,
+        }));
+      }
+      speedButton?.dispatchEvent(new MouseEvent('mousedown', {
+        bubbles: true,
+        button: 0,
+        clientX: 100,
+        clientY: 20,
+      }));
+      const event = new MouseEvent('mousemove', { bubbles: true });
+      Object.defineProperty(event, 'movementX', { value: -18 });
+      document.dispatchEvent(event);
+
+      const transform = speedButton
+        ?.querySelector<HTMLElement>('.speed-readout')
+        ?.style.transform;
+      expect(Number.parseFloat(transform?.match(/-?[\d.]+/)?.[0] ?? '0'))
+        .toBeCloseTo(-2.7);
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    });
+
+    it('resets playback to 1x on double click', () => {
+      const toolbar = setupDial();
+      const speedButton = toolbar?.shadowRoot
+        ?.querySelector<HTMLButtonElement>('.speed-half');
+
+      for (let index = 0; index < 3; index += 1) {
+        speedButton?.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'ArrowRight',
+          bubbles: true,
+        }));
+      }
+      expect(speedButton?.textContent).toBe('8×');
+
+      speedButton?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+      expect(speedButton?.textContent).toBe('1×');
     });
   });
 
   describe('shutdownDial()', () => {
-    it('should do nothing if dial not active', () => {
-      shutdownDial();
-      expect(mockElement.remove).not.toHaveBeenCalled();
-    });
-
-    it('should remove dial from DOM', () => {
-      setupDial();
-      shutdownDial();
-      // Check that dial was deactivated
+    it('does nothing if the toolbar is not active', () => {
+      expect(() => shutdownDial()).not.toThrow();
       expect(isDialActive()).toBe(false);
     });
 
-    it('should allow setupDial again after shutdown', () => {
-      setupDial();
+    it('removes the toolbar from the DOM', () => {
+      const toolbar = setupDial();
       shutdownDial();
-      const result = setupDial();
-      expect(result).not.toBeNull();
+
+      expect(toolbar?.isConnected).toBe(false);
+      expect(isDialActive()).toBe(false);
+    });
+
+    it('allows setup after shutdown', () => {
+      const first = setupDial();
+      shutdownDial();
+      const second = setupDial();
+
+      expect(second).not.toBeNull();
+      expect(second).not.toBe(first);
+    });
+
+    it('allows setup again after the toolbar close control is used', async () => {
+      const first = setupDial();
+      const closeButton = first?.shadowRoot?.querySelector<HTMLButtonElement>('.close-button');
+
+      closeButton?.click();
+      await new Promise((resolve) => globalThis.setTimeout(resolve, 200));
+
+      expect(isDialActive()).toBe(false);
+      expect(setupDial()).not.toBeNull();
     });
   });
 
   describe('isDialActive()', () => {
-    it('should return false initially', () => {
+    it('is false initially', () => {
       expect(isDialActive()).toBe(false);
     });
 
-    it('should return true after setupDial', () => {
+    it('is true after setup', () => {
       setupDial();
       expect(isDialActive()).toBe(true);
     });
 
-    it('should return false after shutdownDial', () => {
+    it('is false after shutdown', () => {
       setupDial();
       shutdownDial();
       expect(isDialActive()).toBe(false);

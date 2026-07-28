@@ -1,216 +1,137 @@
-# slowmo Specification
+# Slowmo Specification
 
-## Overview
+## Product surfaces
 
-`slowmo` is a universal slow-motion controller for web pages. It intercepts time at multiple levels to slow down (or speed up) all animations on a page.
+Slowmo has three delivery modes backed by one timing runtime and one toolbar:
 
-## API
+| Surface | Entry point | Purpose |
+|---|---|---|
+| Headless | `slowmo` | Custom UI and direct programmatic control |
+| Embedded toolbar | `slowmo/toolbar`, `slowmo/react` | Product-integrated debugging tool |
+| Chrome extension | Generated extension bundles | On-demand control of arbitrary pages |
 
-```js
-import { slowmo } from 'slowmo';
+Neither the timing runtime nor toolbar depends on React. The React entry point
+is an optional adapter.
 
-// Set speed (0.5 = half speed, 0.1 = 10x slower, 2 = 2x faster)
-slowmo(0.5);
+## Headless lifecycle
 
-// Pause everything
-slowmo(0);
+- Importing `slowmo` MUST NOT patch the page.
+- `activate()` or the first playback command MUST acquire the shared runtime.
+- The first owner in a realm MUST capture native timing functions exactly once.
+- Later owners MUST reuse the runtime rather than patching wrappers.
+- `destroy()` MUST be idempotent.
+- The last owner to call `destroy()` MUST:
+  - Restore captured timing function identities.
+  - Cancel Slowmo's polling request.
+  - Restore live Web Animation and media playback rates.
+  - Resume only objects paused by Slowmo.
+  - Reset the controller snapshot to inactive 1×.
 
-// Back to normal
-slowmo(1);
-
-// Or use object API for more control
-slowmo.setSpeed(0.5);
-slowmo.pause();
-slowmo.play();
-slowmo.reset();
-```
-
-## Dial Component API
-
-The dial provides a visual UI for controlling slowmo speed.
-
-### Vanilla JS (`slowmo/dial`)
-
-```js
-import { setupDial, shutdownDial, isDialActive } from 'slowmo/dial';
-
-setupDial();         // Returns HTMLElement or null (if already active)
-shutdownDial();      // Removes dial, cleans up listeners
-isDialActive();      // Returns boolean
-```
-
-**Singleton:** Only one dial can exist. Second `setupDial()` returns null.
-
-### React (`slowmo/react`)
-
-```jsx
-import { Slowmo } from 'slowmo/react';
-<Slowmo />  // Mount in app, auto-cleans on unmount
-```
-
-### Dial Interaction Zones
-
-| Zone | Radius | Action |
-|------|--------|--------|
-| Center | 0-14px | Toggle pause/play |
-| Middle | 14-24px | Drag to reposition |
-| Outer | 24px+ | Rotate to change speed (Pointer Lock) |
-
-### Speed Range
-
-- Min: 1/60 (~0.017x)
-- Max: 10x
-- Snaps to 1x when close (0.92-1.08 range)
-
-## What It Controls
-
-| Animation Type | How It's Controlled |
-|---------------|---------------------|
-| CSS Animations | Web Animations API `playbackRate` |
-| CSS Transitions | Web Animations API `playbackRate` |
-| Videos/Audio | `playbackRate` property |
-| requestAnimationFrame | Monkey-patch to scale timestamps |
-| performance.now() | Returns virtual time |
-| Date.now() | Returns virtual epoch time |
-| setTimeout/setInterval | Scaled delays |
-| GSAP | `gsap.globalTimeline.timeScale()` (if available) |
-| Three.js | Uses rAF, so handled automatically |
-| Framer Motion/Motion | Uses Date.now(), handled automatically |
-
-## Speed Limits
-
-| Animation Type | Min Speed | Max Speed | Notes |
-|----------------|-----------|-----------|-------|
-| Video/Audio | 0.0625 | 16x | Chrome limits; Safari only 0.5-2x |
-| Web Animations | ~0 | unlimited | Very high speeds skip keyframes |
-| rAF timestamps | ~0 | unlimited | High speeds = jerky movement |
-
-**Practical recommendations:**
-- **Slow motion**: 0.1x to 0.5x works great everywhere
-- **Ultra slow**: 0.01x to 0.1x for debugging (video may not go this low)
-- **Fast forward**: 2x is safe on all browsers, 4x on modern browsers
-
-## Exclusions
-
-Elements with `data-slowmo-exclude` attribute are not affected.
-
-```html
-<div data-slowmo-exclude>This animation runs at normal speed</div>
-```
-
-## Demo Page Requirements
-
-The demo should showcase slowmo working with:
-1. CSS keyframe animation (spinner, bounce)
-2. CSS transition (hover effect)
-3. Video player
-4. Canvas animation (particles or similar)
-5. Three.js 3D scene (rotating cube)
-6. GSAP timeline
-7. Framer Motion spring animation
-
-Include a nice UI with a speed slider and preset buttons (0.1x, 0.25x, 0.5x, 1x, 2x).
-
-## Chrome Extension
-
-The Chrome extension provides page-wide control with full iframe support.
-
-### Extension Goals
-
-1. **Single top-level control** - One speed slider controls the entire page
-2. **All frames synchronized** - Same speed applied to main page and all iframes
-3. **Nested iframe support** - Works with iframes within iframes (any depth)
-4. **Cross-origin iframes** - CodeSandbox, StackBlitz, embedded demos all work
-5. **Dynamic iframes** - Newly added iframes automatically synchronized
-6. **All animation types** - Every animation type works in every iframe
-
-### How It Works
-
-| Mechanism | Purpose |
-|-----------|---------|
-| `all_frames: true` in manifest | Chrome auto-injects content script into ALL frames |
-| `broadcastToFrames()` | Parent sends postMessage to all child iframes on speed change |
-| Message listener | Each iframe listens, applies speed, forwards to nested iframes |
-| `MutationObserver` | Detects dynamically added iframes and syncs them |
-
-### Iframe Sync Protocol
-
-```js
-// Message format
-{
-  type: 'slowmo-extension-sync',
-  speed: 0.5,    // Current speed multiplier
-  paused: false  // Whether playback is paused
+```ts
+interface SlowmoSnapshot {
+  status: "inactive" | "active";
+  speed: number;
+  paused: boolean;
 }
 ```
 
-### Test Scenarios
+`play()` resumes the most recent non-zero finite speed or 1×.
 
-The extension should pass these iframe tests:
+## Toolbar lifecycle
 
-1. **Same-origin iframe** - Animations slow down correctly
-2. **Cross-origin iframe** - Animations slow down (via content script injection)
-3. **Nested iframes** - Parent → Child → Grandchild all synchronized
-4. **Dynamic iframe** - iframe added via JS gets synchronized
-5. **All animation types in iframe** - CSS, rAF, WAAPI, video, GSAP all work
-6. **Speed changes propagate** - Changing speed updates all frames immediately
-7. **Pause/resume propagates** - Pausing stops all frames, resume restarts all
+The canonical toolbar is `createSlowmoToolbar()`.
 
-## Testing
+- Default placement is bottom-right.
+- Default embedded shortcut is `Mod+Shift+S`.
+- Close MUST deactivate the toolbar's controller before removing the UI.
+- Close MUST leave the host available for `open()` or its shortcut.
+- Destroy MUST also remove the host shortcut and other listeners.
+- Open after Close MUST start at 1×.
+- Placement and orientation persist by default.
+- Speed and open/closed state do not persist by default.
+- Persistence is replaceable or disableable.
+- The toolbar MUST remain above page content and account for classic page
+  scrollbars.
+- Dragging to a side edge rotates the toolbar vertically.
+- An element-relative anchor follows its element until the first drag.
 
-### Test Commands
+Presets:
 
-```bash
-npm run test:unit      # Unit tests (Vitest)
-npm run test:e2e       # E2E tests (Playwright) - runs headlessly
-npm run test:all       # Both unit + E2E
-npm run test:e2e:extension  # Extension tests (requires headed Chrome)
-```
+`1/64×`, `1/32×`, `1/16×`, `1/8×`, `1/4×`, `1/2×`, `1×`, `2×`, `4×`,
+`8×`, `16×`, `32×`, `∞`.
 
-### Test Coverage
+The speed scrub has a sticky 1× stop and double-click resets to 1×.
 
-| Category | Tests | What's Measured |
-|----------|-------|-----------------|
-| CSS Animations | 5 | playbackRate, pause, progress, exclusions |
-| requestAnimationFrame | 4 | timestamp scaling, virtual time, pause |
-| Web Animations API | 5 | playbackRate, currentTime, dynamic animations |
-| Video/Audio | 8 | playbackRate, clamping, pause/resume |
-| GSAP | 4 | globalTimeline.timeScale |
-| iframe sync | 7 | postMessage sync, pause propagation |
-| Unit tests | 29 | API, virtual time, tracking |
+## React
 
-**Total: ~125 automated tests across Chromium/Firefox/WebKit**
+- `<SlowmoToolbar />` MUST mount the canonical vanilla toolbar.
+- React Strict Mode MUST NOT leave duplicate hosts, controllers, or listeners.
+- Unmount MUST destroy resources owned by the component.
+- `useSlowmo()` provides a headless custom-control API.
+- `useSlowmoController()` and `useSlowmoSnapshot()` support advanced
+  composition.
+- `<Slowmo />` remains a deprecated compatibility alias.
 
-### Manual Extension Testing
+## Chrome extension
 
-Automated Playwright tests cannot reliably inject Chrome extension content scripts. To manually verify extension iframe support:
+- The manifest MUST NOT statically inject Slowmo into every page.
+- The action and `_execute_action` command MUST use the same activation
+  boundary.
+- Activation injects the runtime into all eligible frames and the toolbar only
+  into the top frame.
+- Main-world timing code and the isolated-world toolbar communicate through the
+  extension protocol.
+- Newly committed child frames receive the runtime while the tab session is
+  active.
+- Close deactivates every injected frame and clears active-tab bookkeeping.
+- Reload, top-level navigation, and tab removal clear the session.
+- Re-trigger starts at 1×.
+- Tabs are independent.
+- Extension placement/orientation use extension-owned local storage.
 
-1. Load extension: `chrome://extensions` → Developer mode → Load unpacked → `extension/`
-2. Start test server: `npx vite --config vite.test.config.ts`
-3. Open: `http://localhost:5174/tests/fixtures/extension-test.html`
-4. Verify slowmo UI appears and controls ALL spinners (parent + 3 levels of iframes)
+## Exclusions
 
-### Test Fixtures
+Elements carrying `data-slowmo-exclude`, including composed-tree ancestors,
+retain their Web Animation and media playback rates. Realm-wide JavaScript
+clock patches cannot be excluded per element.
 
-| File | Purpose |
-|------|---------|
-| `tests/fixtures/extension-test.html` | Extension test - NO slowmo loaded |
-| `tests/fixtures/plain-iframe.html` | Plain iframe for extension testing |
-| `tests/fixtures/plain-iframe-nested.html` | Nested iframe (2 levels) |
-| `tests/fixtures/plain-iframe-inner.html` | Inner iframe (3 levels deep) |
-| `tests/fixtures/iframe-demo.html` | Manual demo WITH slowmo (not for extension) |
-| `tests/fixtures/test-page.html` | E2E test page with all animation types |
+## Controlled mechanisms
 
-### Gotchas
+| Mechanism | Behavior |
+|---|---|
+| CSS/Web Animations | Multiply developer playback rate |
+| Video/audio | Multiply and clamp playback rate |
+| `requestAnimationFrame` | Pass a virtual timestamp |
+| `performance.now()` | Return virtual monotonic time |
+| `Date.now()` | Return virtual epoch time |
+| Timers | Scale delay when scheduled |
+| GSAP | Set and later restore global timeline scale |
 
-1. **Port 5173 vs 5174**: Demo runs on 5173, tests run on 5174. Don't mix them.
-2. **Extension tests are skipped**: Playwright can't inject extensions reliably. Use manual testing.
-3. **WebKit video timing**: One test skipped due to unreliable video timing in headless WebKit.
-4. **iframe-demo.html vs extension-test.html**: The demo page HAS slowmo loaded. For testing the extension's injection, use `extension-test.html` which has NO slowmo.
+Infinity finishes finite animations and media when possible. Those completed
+effects cannot be reversed on teardown.
 
-## Future Work
+## Demo
 
-1. **CI Integration** - Add GitHub Actions workflow for `npm run test:all`
-2. **Cross-origin iframe testing** - Would require a separate origin server
-3. **Extension E2E** - Consider Puppeteer for better extension support
-4. **Visual regression** - Screenshot comparison tests for animation states
+The single-page website MUST include deep-linkable sections for:
+
+- Try It
+- Animation demos
+- Headless API
+- React Component
+
+The demo toolbar starts centered below “Try It,” follows that anchor until
+dragged, and then behaves like the normal floating toolbar. Landing-page chrome
+uses `data-slowmo-exclude` so its own reveal/navigation motion remains usable at
+very slow speeds.
+
+The demo uses a local looping video and bundled Motion dependency.
+
+## Release gates
+
+- Unit tests for controller, toolbar, React, and extension action boundaries
+- Browser tests for animation mechanisms
+- Real unpacked-extension tests for inactive, activate, frame sync, close,
+  reopen, reload, and dynamic frames
+- Typecheck and all package/demo/extension builds
+- npm package content inspection
+- Exact Chrome ZIP inspection and unpacked smoke test

@@ -1,603 +1,1401 @@
 /**
- * slowmo Rotary Dial Controller
+ * slowmo compact playback toolbar
  *
- * A draggable, rotatable dial for controlling playback speed.
- * - Center: Click to pause/play, drag to reposition
- * - Outer wheel: Drag left/right to rotate and change speed
+ * A small, draggable control for pausing and scrubbing page speed.
+ * The UI is isolated in a shadow root so host-page styles cannot affect it.
  */
 
-// ============================================
-// TRUSTED TYPES-SAFE DOM HELPERS
-// ============================================
-// Some sites set CSP `require-trusted-types-for 'script'` which blocks
-// innerHTML. We use DOMParser instead to avoid these errors entirely.
+export type ToolbarDockEdge =
+  | 'none'
+  | 'left'
+  | 'right'
+  | 'top'
+  | 'bottom'
+  | 'top-left'
+  | 'top-right'
+  | 'bottom-left'
+  | 'bottom-right';
 
-function safeSetHTML(el: Element, html: string): void {
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  el.replaceChildren(...Array.from(doc.body.childNodes));
+interface Point {
+  x: number;
+  y: number;
 }
 
-function safeSetSVGContent(el: Element, svgFragment: string): void {
-  const doc = new DOMParser().parseFromString(
-    `<svg xmlns="http://www.w3.org/2000/svg">${svgFragment}</svg>`,
-    'image/svg+xml',
-  );
-  el.replaceChildren(...Array.from(doc.documentElement.childNodes));
+export interface ToolbarPoint {
+  xPct: number;
+  yPct: number;
 }
 
-// ============================================
-// CONSTANTS
-// ============================================
-
-const DIAL_SIZE = 64;
-const DIAL_RADIUS = DIAL_SIZE / 2;
-
-// Interaction zone radii (from center)
-const PAUSE_ZONE_RADIUS = 14;
-// Outer wheel: PAUSE_ZONE_RADIUS <= r <= DIAL_RADIUS
-
-// Speed range (symmetric: 1/10x to 10x)
-const MIN_SPEED = 0.1;  // 1/10x
-const MAX_SPEED = 10;   // 10x
-
-// Rotation range: symmetric visual limits, 1x at center (0°)
-// Both sides stop 22.5° from straight down
-const MIN_ANGLE = -157.5;  // At speed 1/10 (down-left)
-const MAX_ANGLE = 157.5;   // At speed 10 (down-right)
-
-// Snap to 1x within this range
-const SNAP_SPEED_MIN = 0.92;
-const SNAP_SPEED_MAX = 1.08;
-
-// Delay before center zone shows move cursor hint (ms)
-const HOLD_DELAY_MS = 150;
-
-// Minimum drag distance to count as a drag (pixels)
-const MIN_DRAG_DISTANCE = 3;
-
-// localStorage keys
-const POSITION_KEY = 'slowmo-dial-position';
-const SPEED_KEY = 'slowmo-dial-speed';
-
-// Colors
-const COLOR_BG = '#2A2A2A';
-const COLOR_BRASS = '#797058';
-
-// ============================================
-// MATH UTILITIES
-// ============================================
-
-/**
- * Convert angle to speed using piecewise logarithmic scale.
- * - Negative angles (MIN_ANGLE to 0°): speeds MIN_SPEED to 1
- * - Positive angles (0° to MAX_ANGLE): speeds 1 to MAX_SPEED
- * This keeps 1x at 0° (triangle straight up) with symmetric visual limits.
- */
-function angleToSpeed(angle: number): number {
-  let speed: number;
-
-  if (angle <= 0) {
-    // Slow side: MIN_ANGLE (-157.5°) → 0° maps to MIN_SPEED → 1
-    const t = (angle - MIN_ANGLE) / (0 - MIN_ANGLE);  // 0 at MIN_ANGLE, 1 at 0°
-    speed = MIN_SPEED * Math.pow(1 / MIN_SPEED, t);
-  } else {
-    // Fast side: 0° → MAX_ANGLE (157.5°) maps to 1 → MAX_SPEED
-    const t = angle / MAX_ANGLE;  // 0 at 0°, 1 at MAX_ANGLE
-    speed = 1 * Math.pow(MAX_SPEED / 1, t);
-  }
-
-  // Snap to 1x if close
-  if (speed >= SNAP_SPEED_MIN && speed <= SNAP_SPEED_MAX) {
-    return 1;
-  }
-
-  return speed;
+interface SpeedEntry {
+  value: number;
+  numerator?: number;
+  denominator?: number;
+  whole?: number;
 }
 
-/**
- * Convert speed to angle (inverse of angleToSpeed).
- * Piecewise: slow speeds map to negative angles, fast speeds to positive.
- */
-function speedToAngle(speed: number): number {
-  const clampedSpeed = Math.max(MIN_SPEED, Math.min(MAX_SPEED, speed));
-
-  if (clampedSpeed <= 1) {
-    // Slow side: MIN_SPEED → 1 maps to MIN_ANGLE → 0°
-    const logMin = Math.log(MIN_SPEED);
-    const logSpeed = Math.log(clampedSpeed);
-    const t = (logSpeed - logMin) / (0 - logMin);  // 0 at MIN_SPEED, 1 at 1
-    return MIN_ANGLE + t * (0 - MIN_ANGLE);
-  } else {
-    // Fast side: 1 → MAX_SPEED maps to 0° → MAX_ANGLE
-    const logMax = Math.log(MAX_SPEED);
-    const logSpeed = Math.log(clampedSpeed);
-    const t = logSpeed / logMax;  // 0 at 1, 1 at MAX_SPEED
-    return t * MAX_ANGLE;
-  }
+export interface ToolbarViewState {
+  position: ToolbarPoint;
+  dockEdge: ToolbarDockEdge;
+  isVertical: boolean;
 }
 
+export type ToolbarPlacement =
+  | 'top-left'
+  | 'top-center'
+  | 'top-right'
+  | 'left'
+  | 'center'
+  | 'right'
+  | 'bottom-left'
+  | 'bottom-center'
+  | 'bottom-right'
+  | ToolbarPoint;
 
-/**
- * Clamp angle to valid range.
- */
-function clampAngle(angle: number): number {
-  return Math.max(MIN_ANGLE, Math.min(MAX_ANGLE, angle));
+export interface SlowmoToolbarElement extends HTMLElement {
+  close(): void;
+  destroy(): void;
+  setPlaybackState(speed: number, paused?: boolean): void;
 }
 
-/**
- * Calculate distance from center of dial.
- */
-function distanceFromCenter(x: number, y: number, rect: DOMRect): number {
-  const centerX = rect.left + rect.width / 2;
-  const centerY = rect.top + rect.height / 2;
-  return Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
+export interface ToolbarClock {
+  setTimeout(callback: () => void, delay: number): number;
+  clearTimeout(handle: number): void;
 }
-
-
-// ============================================
-// DIAL CREATION
-// ============================================
 
 export interface DialOptions {
   onSpeedChange: (speed: number) => void;
   onPauseToggle?: (paused: boolean) => void;
+  onClose?: () => void;
   initialSpeed?: number;
   initialPaused?: boolean;
+  layout?: 'floating' | 'inline';
+  defaultPlacement?: ToolbarPlacement;
+  initialState?: Partial<ToolbarViewState>;
+  anchor?: Element | null;
+  anchorSide?: 'top' | 'right' | 'bottom' | 'left';
+  anchorGap?: number;
+  onStateChange?: (state: ToolbarViewState) => void;
+  onClosed?: () => void;
+  clock?: ToolbarClock;
 }
 
-export function createDial(options: DialOptions): HTMLElement {
-  const { onSpeedChange, onPauseToggle } = options;
+const EDGE_THRESHOLD = 16;
+const SPEED_STEP_PIXELS = 18;
+const ONE_X_SNAP_PIXELS = 9;
+const TOOLBAR_HEIGHT = 42;
+const HORIZONTAL_PILL_WIDTH = 84;
+const RING_PADDING = 12;
+const SHELL_BORDER_WIDTH = 2;
+const HORIZONTAL_SHELL_WIDTH =
+  HORIZONTAL_PILL_WIDTH + RING_PADDING * 2 + SHELL_BORDER_WIDTH;
+const HORIZONTAL_SHELL_HEIGHT =
+  TOOLBAR_HEIGHT + RING_PADDING * 2 + SHELL_BORDER_WIDTH;
+const VERTICAL_SHELL_WIDTH =
+  TOOLBAR_HEIGHT + RING_PADDING * 2 + SHELL_BORDER_WIDTH;
+const VERTICAL_SHELL_HEIGHT =
+  HORIZONTAL_PILL_WIDTH + RING_PADDING * 2 + SHELL_BORDER_WIDTH;
 
-  // Load saved speed or use initial/default
-  let savedSpeed = options.initialSpeed ?? 1;
-  try {
-    const stored = localStorage.getItem(SPEED_KEY);
-    if (stored) {
-      const parsed = parseFloat(stored);
-      if (!isNaN(parsed) && parsed >= MIN_SPEED && parsed <= MAX_SPEED) {
-        savedSpeed = parsed;
-      }
-    }
-  } catch {}
+const SPEEDS: SpeedEntry[] = [
+  ...[64, 32, 16, 8, 4, 2].map((denominator) => ({
+    value: 1 / denominator,
+    numerator: 1,
+    denominator,
+  })),
+  { value: 1, whole: 1 },
+  ...[2, 4, 8, 16, 32].map((whole) => ({ value: whole, whole })),
+  { value: Number.POSITIVE_INFINITY, whole: Number.POSITIVE_INFINITY },
+];
 
-  // State
-  let currentAngle = speedToAngle(savedSpeed);
-  let isPaused = options.initialPaused ?? false;
+const ONE_X_SPEED_INDEX = 6;
+// Capture wall-clock timers before a toolbar-owned controller patches the
+// page. Toolbar affordances must remain responsive at every playback speed.
+const DEFAULT_TOOLBAR_CLOCK: ToolbarClock = {
+  setTimeout: (callback, delay) => (
+    globalThis.setTimeout(callback, delay) as unknown as number
+  ),
+  clearTimeout: (handle) => globalThis.clearTimeout(handle),
+};
 
-  // Interaction state
-  type Zone = 'center' | 'wheel' | null;
-  let mouseDownZone: Zone = null;
-  let hasDragged = false;
-  let holdDelayTimer: ReturnType<typeof setTimeout> | null = null;
-
-  // For center zone dragging (reposition)
-  let dragStartRight = 0;
-  let dragStartBottom = 0;
-  let dragStartMouseX = 0;
-  let dragStartMouseY = 0;
-
-  // Rotation sensitivity (degrees per pixel of horizontal movement)
-  const ROTATION_SENSITIVITY = 0.75;
-
-  // Load saved position
-  let position = { right: 20, bottom: 20 };
-  try {
-    const savedPos = localStorage.getItem(POSITION_KEY);
-    if (savedPos) {
-      position = JSON.parse(savedPos);
-    }
-  } catch {}
-
-  // Create container
-  const container = document.createElement('div');
-  container.className = 'slowmo-dial';
-  container.style.cssText = `
+const TOOLBAR_CSS = `
+  :host {
+    all: initial;
     position: fixed;
-    right: ${position.right}px;
-    bottom: ${position.bottom}px;
-    width: ${DIAL_SIZE}px;
-    height: ${DIAL_SIZE}px;
+    inset: 0;
     z-index: 2147483647;
-    user-select: none;
-    font-family: ui-monospace, 'SF Mono', Monaco, monospace;
-  `;
-
-  // The notches SVG (extracted from user's dial.svg design)
-  // These are radial lines around the edge - brass colored
-  // Plus a triangle indicator at the top that rotates with the dial
-  const notchesSvg = `
-    <line x1="32.2086" y1="1.48839" x2="32.2183" y2="3.20793" stroke="${COLOR_BRASS}" stroke-width="1.5" stroke-linecap="round"/>
-    <path d="M32.2071 5.8945L29.7114 10.7167H34.8037L32.2071 5.8945Z" fill="${COLOR_BRASS}"/>
-    <line x1="35.1457" y1="1.53165" x2="35.0337" y2="3.23857" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="38.3373" y1="2.02536" x2="37.9446" y2="3.83661" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="41.4182" y1="2.98466" x2="40.9018" y2="4.53688" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="44.4138" y1="4.10541" x2="43.6976" y2="5.65107" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="49.8958" y1="7.34214" x2="48.8547" y2="8.73655" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="52.1693" y1="9.22075" x2="51.1281" y2="10.6152" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="54.4068" y1="11.4165" x2="53.3657" y2="12.8109" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="56.6366" y1="14.0388" x2="55.1042" y2="15.1372" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="59.6595" y1="19.4885" x2="58.0867" y2="20.2749" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="60.7531" y1="22.4076" x2="59.0996" y2="23.0582" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="62.3239" y1="28.7194" x2="60.2687" y2="28.9295" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="61.7567" y1="25.5569" x2="59.8715" y2="25.9858" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="47.3047" y1="5.87473" x2="46.0292" y2="8.14475" stroke="${COLOR_BRASS}" stroke-width="1.5" stroke-linecap="round"/>
-    <line x1="62.4479" y1="32.1953" x2="59.6913" y2="32.2216" stroke="${COLOR_BRASS}" stroke-width="1.5" stroke-linecap="round"/>
-    <line x1="58.1844" y1="17.0517" x2="56.0159" y2="18.3254" stroke="${COLOR_BRASS}" stroke-width="1.5" stroke-linecap="round"/>
-    <line x1="0.5" y1="-0.5" x2="2.21059" y2="-0.5" transform="matrix(0.0654353 0.997857 0.997857 -0.0654353 29.6227 1)" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="0.5" y1="-0.5" x2="2.35334" y2="-0.5" transform="matrix(0.211897 0.977292 0.977292 -0.211897 26.3475 1.43076)" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="0.5" y1="-0.5" x2="2.13585" y2="-0.5" transform="matrix(0.315659 0.948873 0.948873 -0.315659 23.2006 2.35239)" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="0.5" y1="-0.5" x2="2.20355" y2="-0.5" transform="matrix(0.420454 0.907314 0.907314 -0.420454 20.1317 3.44153)" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="0.5" y1="-0.5" x2="2.24021" y2="-0.5" transform="matrix(0.598277 0.801289 0.801289 -0.598277 14.5078 6.64236)" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="0.5" y1="-0.5" x2="2.24021" y2="-0.5" transform="matrix(0.598277 0.801289 0.801289 -0.598277 12.2344 8.52097)" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="0.5" y1="-0.5" x2="2.24021" y2="-0.5" transform="matrix(0.598277 0.801289 0.801289 -0.598277 9.99683 10.7167)" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="0.5" y1="-0.5" x2="2.3854" y2="-0.5" transform="matrix(0.812788 0.58256 0.58256 -0.812788 7.55042 13.3411)" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="0.5" y1="-0.5" x2="2.25838" y2="-0.5" transform="matrix(0.894426 0.447216 0.447216 -0.894426 4.41907 18.8177)" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="0.5" y1="-0.5" x2="2.2768" y2="-0.5" transform="matrix(0.930561 0.366138 0.366138 -0.930561 3.26685 21.7593)" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="0.5" y1="-0.5" x2="2.56594" y2="-0.5" transform="matrix(0.994816 0.101692 0.101692 -0.994816 1.53162 28.1712)" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="0.5" y1="-0.5" x2="2.43331" y2="-0.5" transform="matrix(0.975087 0.221825 0.221825 -0.975087 2.16882 24.9585)" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="0.75" y1="-0.75" x2="3.35382" y2="-0.75" transform="matrix(0.48985 0.871807 0.871807 -0.48985 17.2839 4.85349)" stroke="${COLOR_BRASS}" stroke-width="1.5" stroke-linecap="round"/>
-    <line x1="0.75" y1="-0.75" x2="3.50666" y2="-0.75" transform="matrix(0.999954 0.00955318 0.00955318 -0.999954 0.772583 31.1166)" stroke="${COLOR_BRASS}" stroke-width="1.5" stroke-linecap="round"/>
-    <line x1="0.75" y1="-0.75" x2="3.2649" y2="-0.75" transform="matrix(0.862266 0.506456 0.506456 -0.862266 5.85083 16.0252)" stroke="${COLOR_BRASS}" stroke-width="1.5" stroke-linecap="round"/>
-    <line x1="0.75" y1="-0.75" x2="5.25" y2="-0.75" transform="matrix(0 -1 -1 0 31.5 62.7045)" stroke="${COLOR_BRASS}" stroke-width="1.5" stroke-linecap="round"/>
-    <line x1="0.5" y1="-0.5" x2="2.21059" y2="-0.5" transform="matrix(-0.0654353 -0.997857 -0.997857 0.0654353 34.6794 62.7045)" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="0.5" y1="-0.5" x2="2.35334" y2="-0.5" transform="matrix(-0.211897 -0.977292 -0.977292 0.211897 37.9546 62.2737)" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="0.5" y1="-0.5" x2="2.13585" y2="-0.5" transform="matrix(-0.315659 -0.948873 -0.948873 0.315659 41.1016 61.3521)" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="0.5" y1="-0.5" x2="2.20355" y2="-0.5" transform="matrix(-0.420454 -0.907314 -0.907314 0.420454 44.1704 60.2629)" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="0.5" y1="-0.5" x2="2.24021" y2="-0.5" transform="matrix(-0.598277 -0.801289 -0.801289 0.598277 49.7943 57.0621)" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="0.5" y1="-0.5" x2="2.24021" y2="-0.5" transform="matrix(-0.598277 -0.801289 -0.801289 0.598277 52.0677 55.1835)" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="0.5" y1="-0.5" x2="2.24021" y2="-0.5" transform="matrix(-0.598277 -0.801289 -0.801289 0.598277 54.3053 52.9878)" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="0.5" y1="-0.5" x2="2.3854" y2="-0.5" transform="matrix(-0.812788 -0.58256 -0.58256 0.812788 56.7517 50.3633)" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="0.5" y1="-0.5" x2="2.25838" y2="-0.5" transform="matrix(-0.894426 -0.447216 -0.447216 0.894426 59.8831 44.8868)" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="0.5" y1="-0.5" x2="2.2768" y2="-0.5" transform="matrix(-0.930561 -0.366138 -0.366138 0.930561 61.0353 41.9452)" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="0.5" y1="-0.5" x2="2.56594" y2="-0.5" transform="matrix(-0.994816 -0.101692 -0.101692 0.994816 62.7705 35.5333)" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="0.5" y1="-0.5" x2="2.43331" y2="-0.5" transform="matrix(-0.975087 -0.221825 -0.221825 0.975087 62.1333 38.746)" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="0.75" y1="-0.75" x2="3.35382" y2="-0.75" transform="matrix(-0.48985 -0.871807 -0.871807 0.48985 47.0182 58.851)" stroke="${COLOR_BRASS}" stroke-width="1.5" stroke-linecap="round"/>
-    <line x1="0.75" y1="-0.75" x2="3.2649" y2="-0.75" transform="matrix(-0.862266 -0.506456 -0.506456 0.862266 58.4513 47.6793)" stroke="${COLOR_BRASS}" stroke-width="1.5" stroke-linecap="round"/>
-    <line x1="29.1565" y1="62.1728" x2="29.2684" y2="60.4659" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="25.9648" y1="61.6791" x2="26.3576" y2="59.8679" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="22.884" y1="60.7198" x2="23.4003" y2="59.1676" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="19.8883" y1="59.5991" x2="20.6045" y2="58.0534" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="14.4063" y1="56.3623" x2="15.4474" y2="54.9679" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="12.1329" y1="54.4837" x2="13.174" y2="53.0893" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="9.89532" y1="52.288" x2="10.9364" y2="50.8936" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="7.66553" y1="49.6657" x2="9.19796" y2="48.5673" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="4.64267" y1="44.216" x2="6.21541" y2="43.4296" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="3.54906" y1="41.2968" x2="5.20248" y2="40.6463" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="1.97818" y1="34.985" x2="4.03341" y2="34.775" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="2.54545" y1="38.1476" x2="4.4306" y2="37.7187" stroke="${COLOR_BRASS}" stroke-linecap="round"/>
-    <line x1="16.9975" y1="57.8297" x2="18.2729" y2="55.5597" stroke="${COLOR_BRASS}" stroke-width="1.5" stroke-linecap="round"/>
-    <line x1="6.11769" y1="46.6528" x2="8.2862" y2="45.3791" stroke="${COLOR_BRASS}" stroke-width="1.5" stroke-linecap="round"/>
-  `;
-
-  // SVG structure
-  const svg = `
-    <svg viewBox="0 0 ${DIAL_SIZE} ${DIAL_SIZE}" style="width:100%;height:100%;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.5));">
-      <!-- Background circle -->
-      <circle cx="${DIAL_RADIUS}" cy="${DIAL_RADIUS}" r="${DIAL_RADIUS}" fill="${COLOR_BG}"/>
-
-      <!-- Rotating notches group (includes triangle indicator) -->
-      <g class="dial-notch" transform="rotate(${currentAngle}, ${DIAL_RADIUS}, ${DIAL_RADIUS})">
-        ${notchesSvg}
-      </g>
-
-      <!-- Pause/Play icon in center -->
-      <g class="dial-pause-icon" transform="translate(${DIAL_RADIUS}, ${DIAL_RADIUS})">
-        ${isPaused
-          ? `<path d="M-4.5 -8.5L7.5 0L-4.5 8.5Z" fill="${COLOR_BRASS}" stroke="${COLOR_BRASS}" stroke-width="1.5" stroke-linejoin="round"/>`
-          : `<line x1="-4.5" y1="-8" x2="-4.5" y2="8" stroke="${COLOR_BRASS}" stroke-width="3" stroke-linecap="round"/>
-             <line x1="5.5" y1="-8" x2="5.5" y2="8" stroke="${COLOR_BRASS}" stroke-width="3" stroke-linecap="round"/>`
-        }
-      </g>
-    </svg>
-  `;
-
-  safeSetHTML(container, svg);
-
-  // Speed display overlay - editable
-  const speedDisplay = document.createElement('div');
-  speedDisplay.className = 'dial-speed';
-  speedDisplay.style.cssText = `
-    position: absolute;
-    bottom: -18px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 11px;
-    font-weight: 600;
-    color: #a8a29e;
-    white-space: nowrap;
-    display: flex;
-    align-items: center;
-  `;
-
-  // The editable number part
-  const speedInput = document.createElement('input');
-  speedInput.type = 'text';
-  speedInput.className = 'dial-speed-input';
-  speedInput.style.cssText = `
-    background: transparent;
-    border: none;
-    outline: none;
-    color: inherit;
-    font: inherit;
-    width: 2.5em;
-    text-align: right;
-    padding: 0;
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: none;
+    max-height: none;
     margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    overflow: hidden;
+    pointer-events: none;
+    color-scheme: light dark;
+    --toolbar-bg: #1e1e1e;
+    --toolbar-fg: #f2f1ed;
+    --toolbar-border: rgba(255, 255, 255, 0.12);
+    --toolbar-divider: rgba(255, 255, 255, 0.1);
+    --toolbar-hover: rgba(255, 255, 255, 0.08);
+    --toolbar-ring: rgba(120, 120, 120, 0.25);
+    --toolbar-ring-border: rgba(255, 255, 255, 0.125);
+    --toolbar-close-border: rgba(255, 255, 255, 0.2);
+    --toolbar-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  }
+
+  :host([data-layout="inline"]) {
+    position: relative;
+    inset: auto;
+    width: 110px;
+    height: 68px;
+    overflow: visible;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :host {
+      --toolbar-bg: #fff;
+      --toolbar-fg: #292929;
+      --toolbar-border: rgba(0, 0, 0, 0.12);
+      --toolbar-divider: rgba(0, 0, 0, 0.08);
+      --toolbar-hover: rgba(0, 0, 0, 0.12);
+      --toolbar-ring-border: rgba(0, 0, 0, 0.05);
+      --toolbar-close-border: rgba(0, 0, 0, 0.15);
+      --toolbar-shadow: 0 5px 18px rgba(0, 0, 0, 0.15);
+    }
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  button {
+    appearance: none;
+    border: 0;
+    font: inherit;
+  }
+
+  .toolbar-shell {
+    position: absolute;
+    width: fit-content;
+    height: fit-content;
+    padding: 12px;
+    border: 1px solid transparent;
+    border-radius: 35px;
+    background: transparent;
+    color: var(--toolbar-fg);
+    overflow: visible;
+    pointer-events: auto;
+    user-select: none;
+    transition:
+      background-color 180ms ease,
+      border-color 180ms ease;
+  }
+
+  .toolbar-shell.hovered,
+  .toolbar-shell.dragging {
+    border-color: var(--toolbar-ring-border);
+    background: var(--toolbar-ring);
+    cursor: grab;
+  }
+
+  .toolbar-shell.dragging {
+    cursor: grabbing;
+  }
+
+  .toolbar-frame {
+    position: relative;
+    opacity: 1;
+    transform: scale(1);
+    transform-origin: center;
+  }
+
+  .toolbar-frame.entering {
+    animation: toolbar-in 220ms ease-out both;
+  }
+
+  .toolbar-frame.leaving {
+    animation: toolbar-out 180ms ease-in both;
+  }
+
+  @keyframes toolbar-in {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  @keyframes toolbar-out {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0; transform: scale(0.9); }
+  }
+
+  .toolbar-pill {
+    position: relative;
+    display: flex;
+    width: 84px;
+    height: 42px;
+    border: 1px solid var(--toolbar-border);
+    border-radius: 21px;
+    background: var(--toolbar-bg);
+    color: var(--toolbar-fg);
+    box-shadow: var(--toolbar-shadow);
+    overflow: hidden;
+  }
+
+  .toolbar-pill.vertical {
+    width: 42px;
+    height: 84px;
+    flex-direction: column;
+  }
+
+  .pill-half {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex: 0 0 42px;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 100%;
+    padding: 0;
+    background: transparent;
+    color: inherit;
+    cursor: default;
+    transition: background-color 180ms ease;
+  }
+
+  .toolbar-pill.vertical .pill-half {
+    width: 100%;
+    height: 42px;
+  }
+
+  .toolbar-pill.hover-left .play-half,
+  .toolbar-pill.hover-right .speed-half {
+    background: var(--toolbar-hover);
+  }
+
+  .toolbar-pill.hover-left .play-half {
+    cursor: pointer;
+  }
+
+  .toolbar-pill.hover-right .speed-half {
+    cursor: ew-resize;
+  }
+
+  .play-half svg {
+    position: relative;
+    left: 2px;
+  }
+
+  .toolbar-pill.vertical .play-half svg {
+    left: 0;
+  }
+
+  .speed-half {
+    min-width: 42px;
+    overflow: hidden;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+    font-size: 12px;
+    letter-spacing: -0.02em;
+  }
+
+  .speed-half.scrubbing {
+    cursor: none !important;
+  }
+
+  .speed-readout {
+    position: relative;
+    left: 0;
+    top: 1px;
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    line-height: 1;
+    text-align: center;
+  }
+
+  .toolbar-pill.vertical .speed-readout {
+    left: 2px;
+    top: -1px;
+  }
+
+  .speed-number-slot {
+    display: inline-flex;
+    width: 20px;
+    flex: 0 0 20px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .speed-whole {
+    display: inline-block;
+    width: 28px;
+    color: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    text-align: center;
+  }
+
+  .speed-fraction {
+    position: relative;
+    top: -1px;
+    display: inline-flex;
+    width: fit-content;
+    flex-direction: column;
+    align-items: center;
+    color: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+
+  .speed-numerator {
+    display: block;
+    width: 100%;
+    font-size: 0.65em;
+    text-align: center;
+  }
+
+  .speed-fraction-line {
+    display: block;
+    width: 80%;
+    height: 1px;
+    margin: 1px auto;
+    background: currentColor;
+  }
+
+  .speed-denominator {
+    display: block;
+    width: 100%;
+    text-align: center;
+  }
+
+  .speed-infinity {
+    position: relative;
+    top: -1px;
+    font-size: 24px;
+    font-weight: 400;
+    line-height: 1;
+  }
+
+  .speed-multiplier {
+    position: relative;
+    top: -1px;
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 0;
+    font-size: 10px;
+    line-height: 1;
+    opacity: 0.7;
+  }
+
+  .pill-divider {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    z-index: 2;
+    width: 8px;
+    height: 100%;
+    padding: 0;
+    background: transparent;
+    cursor: grab;
+    pointer-events: auto;
+    transform: translateX(-50%);
+  }
+
+  .pill-divider:active,
+  .toolbar-shell.dragging .pill-divider {
+    cursor: grabbing;
+  }
+
+  .pill-divider::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 2px;
+    height: 100%;
+    background: var(--toolbar-divider);
+    pointer-events: none;
+    transform: translateX(-50%);
+  }
+
+  .toolbar-pill.vertical .pill-divider {
+    left: 0;
+    top: 50%;
+    width: 100%;
+    height: 8px;
+    transform: translateY(-50%);
+  }
+
+  .toolbar-pill.vertical .pill-divider::before {
+    left: 0;
+    top: 50%;
+    width: 100%;
+    height: 1px;
+    transform: translateY(-50%);
+  }
+
+  .close-button {
+    position: absolute;
+    right: 0;
+    top: 0;
+    z-index: 10;
+    display: grid;
+    width: 22px;
+    height: 22px;
+    place-items: center;
+    padding: 0;
+    border: 1px solid var(--toolbar-close-border);
+    border-radius: 50%;
+    background: var(--toolbar-bg);
+    color: var(--toolbar-fg);
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: auto;
+    transform: scale(0.9);
+    transform-origin: center;
+    transition:
+      opacity 50ms ease,
+      transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .toolbar-shell.hovered .close-button,
+  .close-button:focus-visible {
+    opacity: 0.9;
+  }
+
+  .toolbar-shell.hovered .close-button:hover,
+  .close-button:focus-visible {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .close-button svg {
+    transform: translateX(0.5px);
+  }
+
+  svg {
+    display: block;
+  }
+
+  .tooltip {
+    position: fixed;
+    z-index: 20;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: #111;
+    color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 11px;
+    line-height: 1.2;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
+  }
+
+  .tooltip.above {
+    transform: translate(-50%, -100%);
+  }
+
+  .tooltip.below {
+    transform: translateX(-50%);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .toolbar-frame.entering,
+    .toolbar-frame.leaving {
+      animation-duration: 1ms;
+    }
+
+    .toolbar-shell,
+    .pill-half,
+    .close-button,
+    .speed-readout {
+      transition-duration: 1ms !important;
+    }
+  }
+`;
+
+const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
+
+function appendSvgElement<K extends keyof SVGElementTagNameMap>(
+  parent: SVGElement,
+  tagName: K,
+  attributes: Record<string, string>,
+): SVGElementTagNameMap[K] {
+  const element = document.createElementNS(SVG_NAMESPACE, tagName);
+  Object.entries(attributes).forEach(([name, value]) => {
+    element.setAttribute(name, value);
+  });
+  parent.appendChild(element);
+  return element;
+}
+
+function createIcon(name: 'pause' | 'play' | 'close'): SVGSVGElement {
+  const svg = document.createElementNS(SVG_NAMESPACE, 'svg');
+  svg.setAttribute('width', name === 'close' ? '11' : '13');
+  svg.setAttribute('height', name === 'close' ? '11' : '13');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+
+  if (name === 'pause') {
+    appendSvgElement(svg, 'rect', {
+      x: '6',
+      y: '4',
+      width: '4',
+      height: '16',
+      rx: '1',
+      fill: 'currentColor',
+      stroke: 'none',
+    });
+    appendSvgElement(svg, 'rect', {
+      x: '14',
+      y: '4',
+      width: '4',
+      height: '16',
+      rx: '1',
+      fill: 'currentColor',
+      stroke: 'none',
+    });
+  } else if (name === 'play') {
+    appendSvgElement(svg, 'path', {
+      d: 'M7 4.8v14.4L19 12 7 4.8Z',
+      fill: 'currentColor',
+      stroke: 'currentColor',
+    });
+  } else {
+    appendSvgElement(svg, 'path', {
+      d: 'M18 6 6 18M6 6l12 12',
+    });
+  }
+
+  return svg;
+}
+
+function createFakeCursor(): HTMLDivElement {
+  const cursor = document.createElement('div');
+  cursor.className = 'slowmo-fake-cursor';
+  cursor.setAttribute('aria-hidden', 'true');
+  cursor.style.cssText = `
+    all: initial;
+    position: fixed;
+    z-index: 2147483647;
+    width: 32px;
+    height: 32px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    overflow: visible;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
   `;
+  const svg = document.createElementNS(SVG_NAMESPACE, 'svg');
+  svg.setAttribute('width', '32');
+  svg.setAttribute('height', '32');
+  svg.setAttribute('viewBox', '0 0 32 32');
+  svg.setAttribute('fill', 'none');
+  appendSvgElement(svg, 'path', {
+    'fill-rule': 'evenodd',
+    'clip-rule': 'evenodd',
+    d: 'M19.763 12c.225.001.451.054.653.155l5.508 2.755c.498.249.808.75.808 1.307 0 .557-.31 1.058-.808 1.307l-5.508 2.755a1.46 1.46 0 0 1-2.114-1.307v-5.51c0-.4.158-.775.446-1.051A1.46 1.46 0 0 1 19.763 12ZM12.84 12.001c.806 0 1.462.655 1.462 1.462v5.509a1.462 1.462 0 0 1-2.115 1.307l-5.505-2.755a1.46 1.46 0 0 1 0-2.614l5.505-2.755c.203-.101.428-.154.653-.154Z',
+    fill: 'white',
+  });
+  appendSvgElement(svg, 'path', {
+    'fill-rule': 'evenodd',
+    'clip-rule': 'evenodd',
+    d: 'm25.477 15.805-5.508-2.755a.461.461 0 0 0-.667.413v5.509c0 .343.36.566.667.413l5.508-2.755a.461.461 0 0 0 0-.825ZM7.129 16.63l5.505 2.755a.462.462 0 0 0 .668-.413v-5.509a.462.462 0 0 0-.668-.413l-5.505 2.755a.461.461 0 0 0 0 .825Z',
+    fill: 'black',
+  });
+  cursor.appendChild(svg);
+  return cursor;
+}
 
-  // The 'x' suffix (static)
-  const speedSuffix = document.createElement('span');
-  speedSuffix.textContent = 'x';
-  speedSuffix.className = 'dial-speed-suffix';
+export function isToolbarDockEdge(value: unknown): value is ToolbarDockEdge {
+  return [
+    'none',
+    'left',
+    'right',
+    'top',
+    'bottom',
+    'top-left',
+    'top-right',
+    'bottom-left',
+    'bottom-right',
+  ].includes(String(value));
+}
 
-  speedDisplay.appendChild(speedInput);
-  speedDisplay.appendChild(speedSuffix);
-  container.appendChild(speedDisplay);
+export function isToolbarPoint(value: unknown): value is ToolbarPoint {
+  if (!value || typeof value !== 'object') return false;
+  const point = value as Record<string, unknown>;
+  return (
+    typeof point.xPct === 'number'
+    && typeof point.yPct === 'number'
+    && Number.isFinite(point.xPct)
+    && Number.isFinite(point.yPct)
+    && point.xPct >= 0
+    && point.xPct <= 1
+    && point.yPct >= 0
+    && point.yPct <= 1
+  );
+}
 
-  // Track if we're editing
-  let isEditing = false;
-  let editValueBeforeEdit = '';
+function findClosestSpeedIndex(speed: number): number {
+  if (speed === Number.POSITIVE_INFINITY) return SPEEDS.length - 1;
+  let closestIndex = ONE_X_SPEED_INDEX;
+  let closestDistance = Number.POSITIVE_INFINITY;
 
-  function formatSpeedNumber(speed: number): string {
-    if (speed >= 10) return '10';
-    if (speed <= 0.1) return '0.1';
-    return speed.toFixed(1);
-  }
-
-  function updateSpeedInputDisplay() {
-    if (!isEditing) {
-      if (isPaused) {
-        speedInput.value = 'paused';
-        speedSuffix.style.display = 'none';
-      } else {
-        speedInput.value = formatSpeedNumber(angleToSpeed(currentAngle));
-        speedSuffix.style.display = '';
-      }
+  SPEEDS.forEach((entry, index) => {
+    if (!Number.isFinite(entry.value)) return;
+    const distance = Math.abs(Math.log(entry.value) - Math.log(Math.max(speed, 1 / 64)));
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closestIndex = index;
     }
-  }
-
-  // Initialize display
-  updateSpeedInputDisplay();
-
-  // Speed input event handlers
-  speedInput.addEventListener('focus', () => {
-    if (isPaused) return; // Don't allow editing when paused
-    isEditing = true;
-    editValueBeforeEdit = speedInput.value;
-    speedInput.select();
   });
 
-  speedInput.addEventListener('blur', () => {
-    if (!isEditing) return;
-    commitSpeedEdit();
-  });
+  return closestIndex;
+}
 
-  speedInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      commitSpeedEdit();
-      speedInput.blur();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      cancelSpeedEdit();
-      speedInput.blur();
-    }
-  });
+function viewportSize(): { width: number; height: number } {
+  const root = document.documentElement;
+  return {
+    // clientWidth/clientHeight exclude classic page scrollbars. innerWidth and
+    // innerHeight do not, which can put a docked toolbar underneath them.
+    width: root?.clientWidth || window.innerWidth,
+    height: root?.clientHeight || window.innerHeight,
+  };
+}
 
-  function commitSpeedEdit() {
-    if (!isEditing) return;
-    isEditing = false;
-
-    const value = parseFloat(speedInput.value);
-    if (!isNaN(value)) {
-      // Clamp to valid range
-      const clampedSpeed = Math.max(MIN_SPEED, Math.min(MAX_SPEED, value));
-      currentAngle = speedToAngle(clampedSpeed);
-      updateNotch();
-      saveSpeed();
-      if (!isPaused) {
-        onSpeedChange(clampedSpeed);
-      }
-    }
-    updateSpeedInputDisplay();
+function stateForPlacement(placement: ToolbarPlacement): ToolbarViewState {
+  if (isToolbarPoint(placement)) {
+    return {
+      position: placement,
+      dockEdge: 'none',
+      isVertical: false,
+    };
   }
 
-  function cancelSpeedEdit() {
-    isEditing = false;
-    speedInput.value = editValueBeforeEdit;
-    updateSpeedInputDisplay();
-  }
-
-  function saveSpeed() {
-    try {
-      localStorage.setItem(SPEED_KEY, String(angleToSpeed(currentAngle)));
-    } catch {}
-  }
-
-  // ============================================
-  // UPDATE FUNCTIONS
-  // ============================================
-
-  function updateNotch() {
-    const notch = container.querySelector('.dial-notch') as SVGGElement;
-    if (notch) {
-      notch.setAttribute('transform', `rotate(${currentAngle}, ${DIAL_RADIUS}, ${DIAL_RADIUS})`);
-    }
-  }
-
-  function updatePauseIcon() {
-    const iconGroup = container.querySelector('.dial-pause-icon') as SVGGElement;
-    if (iconGroup) {
-      safeSetSVGContent(iconGroup, isPaused
-        ? `<path d="M-4.5 -8.5L7.5 0L-4.5 8.5Z" fill="${COLOR_BRASS}" stroke="${COLOR_BRASS}" stroke-width="1.5" stroke-linejoin="round"/>`
-        : `<line x1="-4.5" y1="-8" x2="-4.5" y2="8" stroke="${COLOR_BRASS}" stroke-width="3" stroke-linecap="round"/>
-           <line x1="5.5" y1="-8" x2="5.5" y2="8" stroke="${COLOR_BRASS}" stroke-width="3" stroke-linecap="round"/>`);
-    }
-  }
-
-  function updateSpeedDisplay() {
-    updateSpeedInputDisplay();
-  }
-
-  function savePosition() {
-    try {
-      localStorage.setItem(POSITION_KEY, JSON.stringify({
-        right: parseInt(container.style.right),
-        bottom: parseInt(container.style.bottom)
-      }));
-    } catch {}
-  }
-
-  // ============================================
-  // EVENT HANDLERS
-  // ============================================
-
-  function clearHoldTimer() {
-    if (holdDelayTimer !== null) {
-      clearTimeout(holdDelayTimer);
-      holdDelayTimer = null;
-    }
-  }
-
-  function handleMouseDown(e: MouseEvent) {
-    e.preventDefault();
-    const rect = container.getBoundingClientRect();
-    const dist = distanceFromCenter(e.clientX, e.clientY, rect);
-
-    if (dist < PAUSE_ZONE_RADIUS) {
-      // Center zone - could be click (pause/play) or drag (reposition)
-      mouseDownZone = 'center';
-      hasDragged = false;
-      dragStartMouseX = e.clientX;
-      dragStartMouseY = e.clientY;
-      dragStartRight = parseInt(container.style.right) || 0;
-      dragStartBottom = parseInt(container.style.bottom) || 0;
-
-      // Start timer to show move cursor hint if held
-      holdDelayTimer = setTimeout(() => {
-        if (mouseDownZone === 'center' && !hasDragged) {
-          container.style.cursor = 'none';
-        }
-      }, HOLD_DELAY_MS);
-    } else if (dist <= DIAL_RADIUS) {
-      // Outer wheel zone - rotation
-      mouseDownZone = 'wheel';
-      document.body.style.cursor = 'none';
-      container.style.cursor = 'none';
-    }
-  }
-
-  function handleMouseMove(e: MouseEvent) {
-    const rect = container.getBoundingClientRect();
-
-    if (mouseDownZone === 'center') {
-      // Check if moved enough to count as drag
-      const dx = e.clientX - dragStartMouseX;
-      const dy = e.clientY - dragStartMouseY;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      if (distance > MIN_DRAG_DISTANCE) {
-        hasDragged = true;
-        clearHoldTimer();
-        document.body.style.cursor = 'none';
-
-        // Reposition dial: move by the same delta as the mouse
-        // Mouse moved by (dx, dy), so dial should move by same amount
-        // Since we use right/bottom positioning, moving right decreases 'right', moving down decreases 'bottom'
-        const right = dragStartRight - dx;
-        const bottom = dragStartBottom - dy;
-
-        // Clamp to viewport
-        container.style.right = Math.max(0, Math.min(right, window.innerWidth - DIAL_SIZE)) + 'px';
-        container.style.bottom = Math.max(0, Math.min(bottom, window.innerHeight - DIAL_SIZE)) + 'px';
-      }
-    } else if (mouseDownZone === 'wheel') {
-      // Rotate dial based on horizontal mouse movement (pointer lock)
-      // movementX: positive = right = clockwise, negative = left = counterclockwise
-      const delta = e.movementX * ROTATION_SENSITIVITY;
-      const newAngle = currentAngle + delta;
-      currentAngle = clampAngle(newAngle);
-
-      updateNotch();
-      updateSpeedDisplay();
-
-      if (!isPaused) {
-        onSpeedChange(angleToSpeed(currentAngle));
-      }
-    } else {
-      // Not dragging - update hover cursor
-      const dist = distanceFromCenter(e.clientX, e.clientY, rect);
-      if (dist < PAUSE_ZONE_RADIUS) {
-        container.style.cursor = 'pointer';
-      } else if (dist <= DIAL_RADIUS) {
-        container.style.cursor = 'ew-resize';
-      } else {
-        container.style.cursor = '';
-      }
-    }
-  }
-
-  function handleMouseUp() {
-    clearHoldTimer();
-
-    if (mouseDownZone === 'center' && !hasDragged) {
-      // Quick click in center - toggle pause/play
-      isPaused = !isPaused;
-      updatePauseIcon();
-      updateSpeedDisplay();
-      onPauseToggle?.(isPaused);
-      if (!isPaused) {
-        onSpeedChange(angleToSpeed(currentAngle));
-      } else {
-        onSpeedChange(0);
-      }
-    }
-
-    if (mouseDownZone === 'center' && hasDragged) {
-      savePosition();
-    }
-
-    if (mouseDownZone === 'wheel') {
-      saveSpeed();
-    }
-
-    // Reset state
-    mouseDownZone = null;
-    hasDragged = false;
-    document.body.style.cursor = '';
-    container.style.cursor = '';
-  }
-
-  function handleMouseLeave() {
-    // Reset cursor when mouse leaves dial (only if not dragging)
-    if (mouseDownZone === null) {
-      container.style.cursor = '';
-    }
-  }
-
-  // Attach events
-  container.addEventListener('mousedown', handleMouseDown);
-  container.addEventListener('mousemove', handleMouseMove);
-  container.addEventListener('mouseleave', handleMouseLeave);
-  document.addEventListener('mousemove', handleMouseMove);
-  document.addEventListener('mouseup', handleMouseUp);
-
-  // Initial speed callback
-  if (!isPaused) {
-    onSpeedChange(angleToSpeed(currentAngle));
-  }
-
-  // Cleanup function (can be called when removing dial)
-  (container as any).destroy = () => {
-    clearHoldTimer();
-    container.removeEventListener('mousedown', handleMouseDown);
-    container.removeEventListener('mousemove', handleMouseMove);
-    container.removeEventListener('mouseleave', handleMouseLeave);
-    document.removeEventListener('mousemove', handleMouseMove);
-    document.removeEventListener('mouseup', handleMouseUp);
+  const placements: Record<Exclude<ToolbarPlacement, ToolbarPoint>, ToolbarViewState> = {
+    'top-left': {
+      position: { xPct: 0, yPct: 0 },
+      dockEdge: 'top-left',
+      isVertical: false,
+    },
+    'top-center': {
+      position: { xPct: 0.5, yPct: 0 },
+      dockEdge: 'top',
+      isVertical: false,
+    },
+    'top-right': {
+      position: { xPct: 1, yPct: 0 },
+      dockEdge: 'top-right',
+      isVertical: false,
+    },
+    left: {
+      position: { xPct: 0, yPct: 0.5 },
+      dockEdge: 'left',
+      isVertical: true,
+    },
+    center: {
+      position: { xPct: 0.5, yPct: 0.5 },
+      dockEdge: 'none',
+      isVertical: false,
+    },
+    right: {
+      position: { xPct: 1, yPct: 0.5 },
+      dockEdge: 'right',
+      isVertical: true,
+    },
+    'bottom-left': {
+      position: { xPct: 0, yPct: 1 },
+      dockEdge: 'bottom-left',
+      isVertical: false,
+    },
+    'bottom-center': {
+      position: { xPct: 0.5, yPct: 1 },
+      dockEdge: 'bottom',
+      isVertical: false,
+    },
+    'bottom-right': {
+      position: { xPct: 1, yPct: 1 },
+      dockEdge: 'bottom-right',
+      isVertical: false,
+    },
   };
 
-  return container;
+  return placements[placement];
+}
+
+export function createDial(options: DialOptions): SlowmoToolbarElement {
+  const clock = options.clock ?? DEFAULT_TOOLBAR_CLOCK;
+  const initialSpeed = options.initialSpeed && options.initialSpeed > 0 ? options.initialSpeed : 1;
+  const fallbackState = stateForPlacement(options.defaultPlacement ?? 'bottom-right');
+  const initialState: ToolbarViewState = {
+    position: isToolbarPoint(options.initialState?.position)
+      ? options.initialState.position
+      : fallbackState.position,
+    dockEdge: isToolbarDockEdge(options.initialState?.dockEdge)
+      ? options.initialState.dockEdge
+      : fallbackState.dockEdge,
+    isVertical:
+      typeof options.initialState?.isVertical === 'boolean'
+        ? options.initialState.isVertical
+        : fallbackState.isVertical,
+  };
+  const host = document.createElement('div') as unknown as SlowmoToolbarElement;
+  let layoutMode = options.layout ?? 'floating';
+  host.className = 'slowmo-toolbar';
+  host.setAttribute('data-slowmo-exclude', '');
+  host.setAttribute('data-layout', layoutMode);
+  host.setAttribute('role', 'presentation');
+
+  const shadow = host.attachShadow({ mode: 'open' });
+  const style = document.createElement('style');
+  style.textContent = TOOLBAR_CSS;
+  shadow.appendChild(style);
+
+  const shell = document.createElement('div');
+  shell.className = 'toolbar-shell';
+  shell.setAttribute('role', 'toolbar');
+  shell.setAttribute('aria-label', 'Slowmo playback controls');
+
+  const frame = document.createElement('div');
+  frame.className = 'toolbar-frame entering';
+
+  const pill = document.createElement('div');
+  pill.className = 'toolbar-pill';
+
+  const playButton = document.createElement('button');
+  playButton.className = 'pill-half play-half';
+  playButton.type = 'button';
+
+  const speedButton = document.createElement('button');
+  speedButton.className = 'pill-half speed-half';
+  speedButton.type = 'button';
+  speedButton.setAttribute(
+    'aria-label',
+    'Playback speed. Drag or use arrow keys to change; Home resets to 1×.',
+  );
+
+  const divider = document.createElement('span');
+  divider.className = 'pill-divider';
+  divider.setAttribute('aria-hidden', 'true');
+
+  const closeButton = document.createElement('button');
+  closeButton.className = 'close-button';
+  closeButton.type = 'button';
+  closeButton.setAttribute('aria-label', 'Hide toolbar');
+  closeButton.appendChild(createIcon('close'));
+
+  pill.append(playButton, speedButton, divider);
+  frame.appendChild(pill);
+  shell.append(frame, closeButton);
+  shadow.appendChild(shell);
+
+  let speedIndex = findClosestSpeedIndex(initialSpeed);
+  let isPlaying = !(options.initialPaused ?? false);
+  let isVertical = initialState.isVertical;
+  let dockEdge = initialState.dockEdge;
+  let position = initialState.position;
+  let activeAnchor = options.anchor ?? null;
+  let isDragging = false;
+  let didDrag = false;
+  let isScrubbing = false;
+  let hoverZone: 'left' | 'right' | 'dead' = 'dead';
+  let overscroll = 0;
+  let scrubPixelRemainder = 0;
+  let tooltipTimer: number | null = null;
+  let tooltip: HTMLElement | null = null;
+  let closeTimer: number | null = null;
+  let destroyed = false;
+
+  const dragStart: Point = { x: 0, y: 0 };
+  const dragOffset: Point = { x: 0, y: 0 };
+  const scrubStart: Point = { x: 0, y: 0 };
+  const fakeCursorPosition: Point = { x: 0, y: 0 };
+  const fakeCursor = createFakeCursor();
+
+  function shellDimensions(vertical = isVertical): { width: number; height: number } {
+    return vertical
+      ? { width: VERTICAL_SHELL_WIDTH, height: VERTICAL_SHELL_HEIGHT }
+      : { width: HORIZONTAL_SHELL_WIDTH, height: HORIZONTAL_SHELL_HEIGHT };
+  }
+
+  function clampPosition(nextPosition: ToolbarPoint, vertical = isVertical): ToolbarPoint {
+    const dimensions = shellDimensions(vertical);
+    const { width, height } = viewportSize();
+    let x = nextPosition.xPct * width;
+    let y = nextPosition.yPct * height;
+
+    if (dockEdge.includes('left')) x = dimensions.width / 2;
+    if (dockEdge.includes('right')) x = width - dimensions.width / 2;
+    if (dockEdge.includes('top')) y = dimensions.height / 2;
+    if (dockEdge.includes('bottom')) y = height - dimensions.height / 2;
+
+    x = Math.max(dimensions.width / 2, Math.min(width - dimensions.width / 2, x));
+    y = Math.max(dimensions.height / 2, Math.min(height - dimensions.height / 2, y));
+
+    return {
+      xPct: width > 0 ? x / width : 0.5,
+      yPct: height > 0 ? y / height : 0.5,
+    };
+  }
+
+  function updatePosition(): void {
+    if (layoutMode === 'inline') {
+      shell.style.left = '50%';
+      shell.style.top = '50%';
+      shell.style.transform = 'translate(-50%, -50%)';
+      return;
+    }
+
+    if (activeAnchor?.isConnected) {
+      const rect = activeAnchor.getBoundingClientRect();
+      const dimensions = shellDimensions(false);
+      const gap = options.anchorGap ?? 12;
+      const side = options.anchorSide ?? 'bottom';
+      const center = {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      };
+
+      if (side === 'top') center.y = rect.top - gap - dimensions.height / 2;
+      if (side === 'bottom') center.y = rect.bottom + gap + dimensions.height / 2;
+      if (side === 'left') center.x = rect.left - gap - dimensions.width / 2;
+      if (side === 'right') center.x = rect.right + gap + dimensions.width / 2;
+
+      dockEdge = 'none';
+      isVertical = false;
+      const viewport = viewportSize();
+      position = {
+        xPct: viewport.width > 0 ? center.x / viewport.width : 0.5,
+        yPct: viewport.height > 0 ? center.y / viewport.height : 0.5,
+      };
+      shell.style.left = `${center.x}px`;
+      shell.style.top = `${center.y}px`;
+      shell.style.transform = 'translate(-50%, -50%)';
+      return;
+    } else if (activeAnchor) {
+      activeAnchor = null;
+    }
+
+    position = clampPosition(position);
+    const { width, height } = viewportSize();
+    shell.style.left = `${position.xPct * width}px`;
+    shell.style.top = `${position.yPct * height}px`;
+    shell.style.transform = 'translate(-50%, -50%)';
+  }
+
+  function saveState(): void {
+    options.onStateChange?.({
+      position,
+      dockEdge,
+      isVertical,
+    });
+  }
+
+  function renderPlayIcon(): void {
+    playButton.replaceChildren(createIcon(isPlaying ? 'pause' : 'play'));
+    playButton.setAttribute('aria-label', isPlaying ? 'Pause animations' : 'Play animations');
+  }
+
+  function renderSpeed(): void {
+    const entry = SPEEDS[speedIndex];
+    const readout = document.createElement('span');
+    readout.className = 'speed-readout';
+    readout.style.transform = `translateX(${overscroll}px)`;
+    readout.style.transition = isScrubbing
+      ? 'none'
+      : 'transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1)';
+
+    const slot = document.createElement('span');
+    slot.className = 'speed-number-slot';
+
+    if (entry.whole === Number.POSITIVE_INFINITY) {
+      const infinity = document.createElement('span');
+      infinity.className = 'speed-infinity';
+      infinity.textContent = '∞';
+      slot.appendChild(infinity);
+      readout.style.left = '0';
+      readout.style.top = '0';
+    } else if (entry.whole !== undefined) {
+      const whole = document.createElement('span');
+      whole.className = 'speed-whole';
+      whole.textContent = String(entry.whole);
+      slot.appendChild(whole);
+    } else {
+      const fraction = document.createElement('span');
+      fraction.className = 'speed-fraction';
+      const numerator = document.createElement('span');
+      numerator.className = 'speed-numerator';
+      numerator.textContent = String(entry.numerator);
+      const line = document.createElement('span');
+      line.className = 'speed-fraction-line';
+      const denominator = document.createElement('span');
+      denominator.className = 'speed-denominator';
+      denominator.textContent = String(entry.denominator);
+      fraction.append(numerator, line, denominator);
+      slot.appendChild(fraction);
+    }
+
+    readout.appendChild(slot);
+    if (entry.whole !== Number.POSITIVE_INFINITY) {
+      const multiplier = document.createElement('span');
+      multiplier.className = 'speed-multiplier';
+      multiplier.textContent = '×';
+      multiplier.setAttribute('aria-label', 'times');
+      readout.appendChild(multiplier);
+    }
+    speedButton.replaceChildren(readout);
+  }
+
+  function renderOrientation(): void {
+    pill.classList.toggle('vertical', isVertical);
+  }
+
+  function renderHoverZone(): void {
+    pill.classList.toggle('hover-left', hoverZone === 'left');
+    pill.classList.toggle('hover-right', hoverZone === 'right');
+  }
+
+  function selectedSpeed(): number {
+    return SPEEDS[speedIndex].value;
+  }
+
+  function applySelectedSpeed(): void {
+    options.onSpeedChange(isPlaying ? selectedSpeed() : 0);
+  }
+
+  function updateSpeedIndex(nextIndex: number): void {
+    speedIndex = Math.max(0, Math.min(SPEEDS.length - 1, nextIndex));
+    renderSpeed();
+    if (isPlaying) options.onSpeedChange(selectedSpeed());
+  }
+
+  function setPlaybackState(speed: number, paused = false): void {
+    speedIndex = findClosestSpeedIndex(speed);
+    isPlaying = !paused && speed !== 0;
+    renderPlayIcon();
+    renderSpeed();
+    applySelectedSpeed();
+  }
+
+  function clearTooltip(): void {
+    if (tooltipTimer) {
+      clock.clearTimeout(tooltipTimer);
+      tooltipTimer = null;
+    }
+    tooltip?.remove();
+    tooltip = null;
+  }
+
+  function showTooltipDelayed(label: string, control: HTMLElement): void {
+    clearTooltip();
+    tooltipTimer = clock.setTimeout(() => {
+      if (destroyed) return;
+      const rect = control.getBoundingClientRect();
+      const hasRoomAbove = rect.top > 30;
+      tooltip = document.createElement('div');
+      tooltip.className = `tooltip ${hasRoomAbove ? 'above' : 'below'}`;
+      tooltip.setAttribute('role', 'tooltip');
+      tooltip.textContent = label;
+      tooltip.style.left = `${rect.left + rect.width / 2}px`;
+      tooltip.style.top = `${hasRoomAbove ? rect.top - 8 : rect.bottom + 8}px`;
+      shadow.appendChild(tooltip);
+    }, 600);
+  }
+
+  function getHoverZone(clientX: number, clientY: number): 'left' | 'right' | 'dead' {
+    const rect = pill.getBoundingClientRect();
+    const pointerPosition = isVertical ? clientY - rect.top : clientX - rect.left;
+    const dividerPosition = (isVertical ? rect.height : rect.width) / 2;
+    if (pointerPosition >= dividerPosition - 2 && pointerPosition <= dividerPosition + 2) {
+      return 'dead';
+    }
+    return pointerPosition < dividerPosition ? 'left' : 'right';
+  }
+
+  function beginDrag(event: MouseEvent, force = false): void {
+    if (event.button !== 0) return;
+    if (
+      !force
+      && dockEdge === 'none'
+      && (event.target as Element).closest('.toolbar-pill')
+    ) {
+      return;
+    }
+    if (!force && (event.target as Element).closest('button')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    clearTooltip();
+    activeAnchor = null;
+
+    if (layoutMode === 'inline') {
+      const inlineRect = shell.getBoundingClientRect();
+      const viewport = viewportSize();
+      document.body.appendChild(host);
+      layoutMode = 'floating';
+      host.setAttribute('data-layout', layoutMode);
+      dockEdge = 'none';
+      position = {
+        xPct: (inlineRect.left + inlineRect.width / 2) / viewport.width,
+        yPct: (inlineRect.top + inlineRect.height / 2) / viewport.height,
+      };
+      updatePosition();
+      elevateFloatingToolbar();
+    }
+
+    const rect = shell.getBoundingClientRect();
+    dragOffset.x = event.clientX - (rect.left + rect.width / 2);
+    dragOffset.y = event.clientY - (rect.top + rect.height / 2);
+    dragStart.x = event.clientX;
+    dragStart.y = event.clientY;
+    isDragging = true;
+    didDrag = false;
+    shell.classList.add('dragging');
+  }
+
+  function handleDragMove(event: MouseEvent): void {
+    if (!isDragging) return;
+    if (
+      Math.abs(event.clientX - dragStart.x) > 4
+      || Math.abs(event.clientY - dragStart.y) > 4
+    ) {
+      didDrag = true;
+    }
+
+    const centerX = event.clientX - dragOffset.x;
+    const centerY = event.clientY - dragOffset.y;
+    const viewport = viewportSize();
+    const distanceToLeft = centerX;
+    const distanceToRight = viewport.width - centerX;
+    const distanceToTop = centerY;
+    const distanceToBottom = viewport.height - centerY;
+    const nearHorizontalWall =
+      distanceToLeft <= EDGE_THRESHOLD + VERTICAL_SHELL_WIDTH / 2
+      || distanceToRight <= EDGE_THRESHOLD + VERTICAL_SHELL_WIDTH / 2;
+    const nearVerticalWall =
+      distanceToTop <= EDGE_THRESHOLD + HORIZONTAL_SHELL_HEIGHT / 2
+      || distanceToBottom <= EDGE_THRESHOLD + HORIZONTAL_SHELL_HEIGHT / 2;
+
+    let nextVertical = isVertical;
+    if (nearHorizontalWall && !nearVerticalWall) nextVertical = true;
+    if (nearVerticalWall && !nearHorizontalWall) nextVertical = false;
+    dockEdge = 'none';
+    if (nextVertical !== isVertical) {
+      isVertical = nextVertical;
+      renderOrientation();
+    }
+
+    const dimensions = shellDimensions();
+    const x = Math.max(
+      dimensions.width / 2,
+      Math.min(viewport.width - dimensions.width / 2, centerX),
+    );
+    const y = Math.max(
+      dimensions.height / 2,
+      Math.min(viewport.height - dimensions.height / 2, centerY),
+    );
+    position = {
+      xPct: viewport.width > 0 ? x / viewport.width : 0.5,
+      yPct: viewport.height > 0 ? y / viewport.height : 0.5,
+    };
+    updatePosition();
+  }
+
+  function finishDrag(): void {
+    if (!isDragging) return;
+    if (didDrag) {
+      const rect = shell.getBoundingClientRect();
+      const viewport = viewportSize();
+      const nearLeft = rect.left <= EDGE_THRESHOLD;
+      const nearRight = viewport.width - rect.right <= EDGE_THRESHOLD;
+      const nearTop = rect.top <= EDGE_THRESHOLD;
+      const nearBottom = viewport.height - rect.bottom <= EDGE_THRESHOLD;
+
+      if (nearTop && nearLeft) dockEdge = 'top-left';
+      else if (nearTop && nearRight) dockEdge = 'top-right';
+      else if (nearBottom && nearLeft) dockEdge = 'bottom-left';
+      else if (nearBottom && nearRight) dockEdge = 'bottom-right';
+      else if (nearLeft) dockEdge = 'left';
+      else if (nearRight) dockEdge = 'right';
+      else if (nearTop) dockEdge = 'top';
+      else if (nearBottom) dockEdge = 'bottom';
+      else dockEdge = 'none';
+
+      const isCorner = dockEdge.includes('-');
+      if (!isCorner) {
+        if (dockEdge === 'left' || dockEdge === 'right') isVertical = true;
+        if (dockEdge === 'top' || dockEdge === 'bottom') isVertical = false;
+      }
+      renderOrientation();
+      updatePosition();
+      saveState();
+    }
+
+    isDragging = false;
+    shell.classList.remove('dragging');
+    clock.setTimeout(() => {
+      didDrag = false;
+    }, 0);
+  }
+
+  function beginSpeedScrub(event: MouseEvent): void {
+    if (event.button !== 0 || getHoverZone(event.clientX, event.clientY) !== 'right') return;
+    event.preventDefault();
+    event.stopPropagation();
+    clearTooltip();
+    scrubStart.x = event.clientX;
+    scrubStart.y = event.clientY;
+    fakeCursorPosition.x = event.clientX;
+    fakeCursorPosition.y = event.clientY;
+    fakeCursor.style.left = `${fakeCursorPosition.x}px`;
+    fakeCursor.style.top = `${fakeCursorPosition.y}px`;
+    document.documentElement.appendChild(fakeCursor);
+    if (typeof fakeCursor.showPopover === 'function') {
+      try {
+        fakeCursor.setAttribute('popover', 'manual');
+        fakeCursor.showPopover();
+      } catch {
+        // Maximum z-index remains the fallback on browsers without popover support.
+      }
+    }
+    scrubPixelRemainder = 0;
+    isScrubbing = true;
+    speedButton.classList.add('scrubbing');
+    renderSpeed();
+
+    try {
+      const request = speedButton.requestPointerLock?.();
+      request?.catch?.(() => undefined);
+    } catch {
+      // Scrubbing still works without pointer lock until the viewport edge.
+    }
+  }
+
+  function handleScrubMove(event: MouseEvent): void {
+    if (!isScrubbing) return;
+    const delta = event.movementX;
+    const viewport = viewportSize();
+    fakeCursorPosition.x += delta;
+    if (fakeCursorPosition.x > viewport.width) fakeCursorPosition.x = 0;
+    if (fakeCursorPosition.x < 0) fakeCursorPosition.x = viewport.width;
+    fakeCursor.style.left = `${fakeCursorPosition.x}px`;
+    fakeCursor.style.top = `${scrubStart.y}px`;
+    scrubPixelRemainder += delta;
+
+    if (speedIndex === 0 && delta < 0) {
+      scrubPixelRemainder = 0;
+      overscroll = Math.max(-5, overscroll + delta * 0.15);
+      renderSpeed();
+      return;
+    }
+    if (speedIndex === SPEEDS.length - 1 && delta > 0) {
+      scrubPixelRemainder = 0;
+      overscroll = Math.min(5, overscroll + delta * 0.15);
+      renderSpeed();
+      return;
+    }
+
+    overscroll = 0;
+    if (speedIndex !== ONE_X_SPEED_INDEX) {
+      const directionToOne = Math.sign(ONE_X_SPEED_INDEX - speedIndex);
+      const remainingPixels =
+        (ONE_X_SPEED_INDEX - speedIndex) * SPEED_STEP_PIXELS - scrubPixelRemainder;
+      if (
+        Math.sign(scrubPixelRemainder) === directionToOne
+        && Math.abs(remainingPixels) <= ONE_X_SNAP_PIXELS
+      ) {
+        updateSpeedIndex(ONE_X_SPEED_INDEX);
+        scrubPixelRemainder = 0;
+        return;
+      }
+    }
+
+    const steps = Math.trunc(scrubPixelRemainder / SPEED_STEP_PIXELS);
+    if (steps === 0) return;
+    const previousIndex = speedIndex;
+    updateSpeedIndex(speedIndex + steps);
+    scrubPixelRemainder =
+      speedIndex === previousIndex
+        ? 0
+        : scrubPixelRemainder - steps * SPEED_STEP_PIXELS;
+  }
+
+  function finishScrub(): void {
+    if (!isScrubbing) return;
+    if (document.pointerLockElement) document.exitPointerLock();
+    isScrubbing = false;
+    scrubPixelRemainder = 0;
+    speedButton.classList.remove('scrubbing');
+    fakeCursor.remove();
+    clock.setTimeout(() => {
+      overscroll = 0;
+      renderSpeed();
+    }, 0);
+  }
+
+  function handlePointerLockChange(): void {
+    if (isScrubbing && !document.pointerLockElement) finishScrub();
+  }
+
+  function handleResize(): void {
+    updatePosition();
+  }
+
+  function elevateFloatingToolbar(): void {
+    if (
+      layoutMode !== 'floating'
+      || !host.isConnected
+      || typeof host.showPopover !== 'function'
+    ) {
+      return;
+    }
+
+    try {
+      host.setAttribute('popover', 'manual');
+      if (!host.matches(':popover-open')) host.showPopover();
+    } catch {
+      // Maximum z-index remains the fallback on browsers without popover support.
+    }
+  }
+
+  function destroy(): void {
+    if (destroyed) return;
+    destroyed = true;
+    clearTooltip();
+    if (closeTimer) clock.clearTimeout(closeTimer);
+    finishScrub();
+    document.removeEventListener('mousemove', handleDocumentMouseMove);
+    document.removeEventListener('mouseup', handleDocumentMouseUp);
+    document.removeEventListener('pointerlockchange', handlePointerLockChange);
+    window.removeEventListener('resize', handleResize);
+    window.removeEventListener('scroll', handleResize);
+    try {
+      if (host.matches(':popover-open')) host.hidePopover();
+    } catch {
+      // The toolbar may be using the z-index fallback.
+    }
+    host.remove();
+  }
+
+  function close(): void {
+    if (destroyed || frame.classList.contains('leaving')) return;
+    clearTooltip();
+    isPlaying = true;
+    options.onPauseToggle?.(false);
+    options.onSpeedChange(1);
+    options.onClose?.();
+    frame.classList.remove('entering');
+    frame.classList.add('leaving');
+    closeTimer = clock.setTimeout(() => {
+      destroy();
+      options.onClosed?.();
+    }, 180);
+  }
+
+  function handleDocumentMouseMove(event: MouseEvent): void {
+    handleDragMove(event);
+    handleScrubMove(event);
+  }
+
+  function handleDocumentMouseUp(): void {
+    finishDrag();
+    finishScrub();
+  }
+
+  pill.addEventListener('mousemove', (event) => {
+    hoverZone = getHoverZone(event.clientX, event.clientY);
+    renderHoverZone();
+  });
+  pill.addEventListener('mouseleave', () => {
+    hoverZone = 'dead';
+    renderHoverZone();
+  });
+  shell.addEventListener('mouseenter', () => shell.classList.add('hovered'));
+  shell.addEventListener('mouseleave', () => {
+    shell.classList.remove('hovered');
+    clearTooltip();
+  });
+  shell.addEventListener('mousedown', (event) => beginDrag(event));
+  divider.addEventListener('mousedown', (event) => beginDrag(event, true));
+
+  playButton.addEventListener('mouseenter', () => {
+    showTooltipDelayed(isPlaying ? 'Pause all animations' : 'Play all animations', playButton);
+  });
+  playButton.addEventListener('mouseleave', clearTooltip);
+  playButton.addEventListener('mousedown', (event) => event.stopPropagation());
+  playButton.addEventListener('click', (event) => {
+    event.stopPropagation();
+    isPlaying = !isPlaying;
+    renderPlayIcon();
+    options.onPauseToggle?.(!isPlaying);
+    applySelectedSpeed();
+  });
+
+  speedButton.addEventListener('mouseenter', () => {
+    showTooltipDelayed('Scrub through speed presets', speedButton);
+  });
+  speedButton.addEventListener('mouseleave', clearTooltip);
+  speedButton.addEventListener('mousedown', beginSpeedScrub);
+  speedButton.addEventListener('dblclick', () => updateSpeedIndex(ONE_X_SPEED_INDEX));
+  speedButton.addEventListener('keydown', (event) => {
+    let nextIndex: number | null = null;
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+      nextIndex = speedIndex - 1;
+    } else if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
+      nextIndex = speedIndex + 1;
+    } else if (event.key === 'Home') {
+      nextIndex = ONE_X_SPEED_INDEX;
+    } else if (event.key === 'End') {
+      nextIndex = SPEEDS.length - 1;
+    }
+    if (nextIndex === null) return;
+    event.preventDefault();
+    updateSpeedIndex(nextIndex);
+  });
+
+  closeButton.addEventListener('mouseenter', () => {
+    showTooltipDelayed('Hide the toolbar', closeButton);
+  });
+  closeButton.addEventListener('mouseleave', clearTooltip);
+  closeButton.addEventListener('mousedown', (event) => event.stopPropagation());
+  closeButton.addEventListener('click', (event) => {
+    event.stopPropagation();
+    close();
+  });
+
+  document.addEventListener('mousemove', handleDocumentMouseMove);
+  document.addEventListener('mouseup', handleDocumentMouseUp);
+  document.addEventListener('pointerlockchange', handlePointerLockChange);
+  window.addEventListener('resize', handleResize);
+  window.addEventListener('scroll', handleResize, { passive: true });
+
+  renderPlayIcon();
+  renderSpeed();
+  renderOrientation();
+  updatePosition();
+  applySelectedSpeed();
+
+  clock.setTimeout(() => frame.classList.remove('entering'), 220);
+  if (layoutMode === 'floating') queueMicrotask(elevateFloatingToolbar);
+  host.close = close;
+  host.destroy = destroy;
+  host.setPlaybackState = setPlaybackState;
+
+  return host;
 }
 
 export default createDial;

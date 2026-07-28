@@ -111,9 +111,12 @@ describe('Animation Tracking', () => {
 
     it('should resume animations when unpausing', () => {
       const mockAnim = createMockAnimation(1);
-      mockAnim.pause = vi.fn();
-      mockAnim.play = vi.fn();
-      mockAnim.playState = 'paused';
+      mockAnim.pause = vi.fn(() => {
+        mockAnim.playState = 'paused';
+      });
+      mockAnim.play = vi.fn(() => {
+        mockAnim.playState = 'running';
+      });
       mockAnimations = [mockAnim];
 
       slowmo(0); // Pause

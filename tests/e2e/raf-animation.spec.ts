@@ -10,12 +10,13 @@ test.describe('requestAnimationFrame timestamp manipulation', () => {
   test('at 0.5x speed, rAF timestamp delta is halved', async ({ page }) => {
     // This test verifies that rAF callbacks receive slowed-down timestamps
     const result = await page.evaluate(async () => {
+      const realNow = Date.now.bind(Date);
       (window as any).slowmo(0.5);
 
       return new Promise<{ virtualDelta: number; realDuration: number }>(resolve => {
         let firstTs: number | null = null;
         let lastTs: number | null = null;
-        const startReal = Date.now(); // Use Date.now for real time tracking
+        const startReal = realNow();
 
         function capture(ts: number) {
           if (firstTs === null) {
@@ -23,12 +24,12 @@ test.describe('requestAnimationFrame timestamp manipulation', () => {
           }
           lastTs = ts;
 
-          if (Date.now() - startReal < 500) {
+          if (realNow() - startReal < 500) {
             requestAnimationFrame(capture);
           } else {
             resolve({
               virtualDelta: lastTs! - firstTs!,
-              realDuration: Date.now() - startReal
+              realDuration: realNow() - startReal
             });
           }
         }
@@ -44,12 +45,13 @@ test.describe('requestAnimationFrame timestamp manipulation', () => {
 
   test('at 2x speed, rAF timestamp delta is doubled', async ({ page }) => {
     const result = await page.evaluate(async () => {
+      const realNow = Date.now.bind(Date);
       (window as any).slowmo(2);
 
       return new Promise<{ virtualDelta: number; realDuration: number }>(resolve => {
         let firstTs: number | null = null;
         let lastTs: number | null = null;
-        const startReal = Date.now();
+        const startReal = realNow();
 
         function capture(ts: number) {
           if (firstTs === null) {
@@ -57,12 +59,12 @@ test.describe('requestAnimationFrame timestamp manipulation', () => {
           }
           lastTs = ts;
 
-          if (Date.now() - startReal < 300) {
+          if (realNow() - startReal < 300) {
             requestAnimationFrame(capture);
           } else {
             resolve({
               virtualDelta: lastTs! - firstTs!,
-              realDuration: Date.now() - startReal
+              realDuration: realNow() - startReal
             });
           }
         }
@@ -79,10 +81,11 @@ test.describe('requestAnimationFrame timestamp manipulation', () => {
     // Test that performance.now() (virtual time) freezes when paused
     // Note: rAF callbacks don't fire when paused, so we test via performance.now
     const result = await page.evaluate(async () => {
+      const realSetTimeout = window.setTimeout.bind(window);
       (window as any).slowmo(1);
 
       // Wait a bit at normal speed
-      await new Promise(r => setTimeout(r, 100));
+      await new Promise(r => realSetTimeout(r, 100));
       const beforePause = performance.now();
 
       // Pause
@@ -90,7 +93,7 @@ test.describe('requestAnimationFrame timestamp manipulation', () => {
       const pauseTime = performance.now();
 
       // Wait real time while paused
-      await new Promise(r => setTimeout(r, 200));
+      await new Promise(r => realSetTimeout(r, 200));
       const afterPauseWait = performance.now();
 
       return {
@@ -111,15 +114,17 @@ test.describe('requestAnimationFrame timestamp manipulation', () => {
   test('performance.now returns virtual time', async ({ page }) => {
     // Verify that performance.now() also returns virtual time
     const result = await page.evaluate(async () => {
+      const realNow = Date.now.bind(Date);
+      const realSetTimeout = window.setTimeout.bind(window);
       (window as any).slowmo(0.5);
 
       const startVirtual = performance.now();
-      const startReal = Date.now();
+      const startReal = realNow();
 
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => realSetTimeout(r, 400));
 
       const endVirtual = performance.now();
-      const endReal = Date.now();
+      const endReal = realNow();
 
       return {
         virtualDelta: endVirtual - startVirtual,

@@ -1,148 +1,94 @@
 # Chrome Extension Publishing Checklist
 
-## Developer Account
-- [x] Chrome Web Store Developer Account ($5 one-time fee)
+## Build and automated verification
 
-## Extension Files
-- [x] manifest.json (Manifest V3)
-- [x] Icons: 16x16, 48x48, 128x128 PNG
-- [x] popup.html
-- [x] content.js
-- [x] Create ZIP package (`slowmo-extension.zip`)
+- [ ] `bun run typecheck`
+- [ ] `bun run test:unit`
+- [ ] `bun run test:e2e`
+- [ ] `bun run test:e2e:extension`
+- [ ] `bun run build:ext`
+- [ ] `bun run zip:extension`
+- [ ] Confirm `manifest.json`, `background.js`, `runtime.js`, and `toolbar.js`
+      are at the ZIP root
 
-## Store Listing Assets
+## Load unpacked
 
-### Screenshots (required, 1-5 images, 1280x800 or 640x400 PNG)
+1. Open `chrome://extensions`.
+2. Enable Developer mode.
+3. Choose Load unpacked and select `extension/`.
+4. For later changes, rebuild and click Reload on the extension card.
 
-**Shot 1: Hero Shot - Dial in Action**
-- Show the slowmo dial floating over a visually interesting website (e.g., an animation-heavy landing page or video player)
-- Dial should be at 0.25x or 0.5x speed
-- Caption: "Control time on any webpage"
+Verify:
 
-**Shot 2: Speed Control Demo**
-- Split view or sequence showing the dial at different speeds (0.1x, 1x, 5x)
-- Show the speed readout clearly
-- Caption: "From 1/60x to 10x speed"
+- [ ] A normal page is untouched before the extension is triggered
+- [ ] Icon and assigned shortcut activate the already-open tab
+- [ ] Exactly one toolbar appears
+- [ ] Scrubbing, pause/play, double-click 1×, dragging, docking, and side
+      orientation work
+- [ ] Page-level scrollbars do not cover the toolbar
+- [ ] Close immediately returns live animations/media to their developer rates,
+      restores native timing hooks, and removes the toolbar
+- [ ] Triggering again starts at 1×
+- [ ] Reloading or navigating is inactive
+- [ ] Two tabs remain independent
+- [ ] Same-origin, cross-origin, nested, and dynamically created frames sync
+- [ ] Strict Trusted Types pages render the toolbar
+- [ ] Light and dark system appearances render correctly
+- [ ] Chrome internal pages and the Web Store stay inactive and show `!`
 
-**Shot 3: Video Slowdown**
-- YouTube or video player with dial visible
-- Show dial at slow speed (0.25x)
-- Caption: "Slow down videos for analysis"
+## Publish an update
 
-**Shot 4: Animation Debugging**
-- Developer-focused: show a site with CSS animations
-- DevTools open alongside the dial
-- Caption: "Debug animations frame by frame"
+1. Increase `version` in `extension/manifest.json`. Chrome requires every
+   uploaded version to be greater than the published version.
+2. Run every check above.
+3. Upload `slowmo-extension.zip` to the existing item in the Chrome Web Store
+   Developer Dashboard.
+4. Update listing and privacy declarations if permissions or behavior changed.
+5. Submit for review. Choose deferred publishing if coordinating the release.
 
-**Shot 5: Pause Feature**
-- Show the dial in paused state (play icon visible)
-- Caption: "Pause everything instantly"
+The extension manifest version is independent from the npm version.
 
-### Small Promo Tile (optional, 440x280 PNG)
-- Dark background (#1c1917 to match extension)
-- Slowmo dial graphic centered
-- "slowmo" text below
-- Tagline: "Control time on any webpage"
+## Store listing copy
 
-### Marquee (optional, 1400x560 PNG)
-- Same dark theme
-- Larger dial graphic on left
-- Right side: "slowmo" + tagline + feature bullets
+### Summary
 
-## Privacy Policy
-- [x] Create privacy policy page (`demo/privacy-policy.html`)
-- [ ] Deploy to slowmo.dev/privacy-policy (push to main + Vercel deploy)
-
-### Privacy Policy Content
-
-```
-Privacy Policy for slowmo Chrome Extension
-
-Last updated: February 2025
-
-slowmo is a browser extension that controls animation and video playback speed on web pages.
-
-Data Collection
-slowmo does NOT collect, store, or transmit any personal data. The extension:
-- Does not track your browsing history
-- Does not collect analytics or usage data
-- Does not use cookies
-- Does not communicate with any external servers
-- Does not access or store any personal information
-
-Local Storage
-The extension stores only one piece of data locally on your device:
-- The position of the slowmo dial on screen (so it remembers where you placed it)
-
-This data never leaves your browser.
-
-Permissions
-The extension requests these permissions:
-- "activeTab" and "scripting": To inject the slowmo script into web pages
-- "<all_urls>": To work on any website you visit
-
-These permissions are used solely to modify animation timing on the current page. No data is collected or transmitted.
-
-Contact
-For questions about this privacy policy, visit https://github.com/seflless/slowmo
-
-Changes
-Any changes to this policy will be posted on this page.
-```
-
-## Store Listing Info
-- [ ] Submit listing
-
-### Title
-slowmo
-
-### Summary (132 characters max)
 Control time on any web page. Slow down or speed up animations, videos, and games.
 
-### Description
-```
-slowmo lets you control time on any website.
+### Behavior
 
-FEATURES
-• Slow down animations to 1/60x speed for frame-by-frame inspection
-• Speed up to 10x for fast-forwarding through content
-• Works with CSS animations, videos, canvas games, GSAP, Three.js, and more
-• Pause everything instantly with one click
-• Beautiful rotary dial interface that stays out of your way
-• Drag to reposition anywhere on screen
-• Works across iframes automatically
+Slowmo is inactive until you click its toolbar icon or use its assigned
+shortcut. It then controls the current tab and its embedded frames. Closing the
+toolbar fully ends that page session; triggering it again starts at 1×.
 
-USE CASES
-• Debug animations - see exactly what's happening at each frame
-• Record product demos - capture smooth slow-motion footage
-• Analyze videos - slow down tutorials, sports, or techniques
-• Speed through content - fast-forward long videos or animations
-• Create dramatic effects - add cinematic slow-mo to any page
+### Features
 
-HOW TO USE
-1. Click the dial to pause/play
-2. Drag the outer ring to adjust speed
-3. Drag the center to reposition
+- Power-of-two presets from 1/64× to 32× and instant completion
+- Pause and resume
+- Draggable, dockable toolbar with light and dark appearance
+- Current-tab iframe synchronization
+- Clean close and reactivation lifecycle
+- Remappable Chrome shortcut
 
-The dial appears in the bottom-right corner of every page. Your position preference is saved automatically.
+## Privacy
 
-OPEN SOURCE
-slowmo is free and open source. View the code and report issues at:
-https://github.com/seflless/slowmo
+Slowmo does not collect or transmit browsing or personal data. It uses:
 
-Also available as an npm package for developers:
-https://www.npmjs.com/package/slowmo
-```
+- `activeTab` and `scripting` to activate after a user invocation
+- `host_permissions` to reach eligible embedded frames
+- `webNavigation` to activate dynamically created frames during an active tab
+  session
+- `storage.local` for toolbar placement and orientation
+- `storage.session` for temporary active-tab bookkeeping
 
-### Category
-Developer Tools
+No speed, browsing history, analytics, or page content is stored.
 
-### Language
-English
+## Listing assets
 
-## Final Steps
-- [ ] Upload ZIP to Chrome Web Store Developer Console
-- [ ] Fill in listing details
-- [ ] Upload screenshots
-- [ ] Add privacy policy URL
-- [ ] Submit for review
+- [ ] 1280×800 or 640×400 hero screenshot
+- [ ] Speed preset screenshot
+- [ ] Video slowdown screenshot
+- [ ] Animation debugging screenshot
+- [ ] Pause screenshot
+- [ ] Privacy policy deployed at `slowmo.dev/privacy-policy`
+- [ ] Listing copy updated
+- [ ] Package uploaded and submitted
