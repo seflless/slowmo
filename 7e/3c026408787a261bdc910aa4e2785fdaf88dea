@@ -1,0 +1,21 @@
+tests/e2e/demo-motion.spec.ts
+  s_83c07eac7f189d::t_a17f8a81bd9f7c 1-20
+demo/index.html
+  s_83c07eac7f189d::t_a9f1c97e399e3f 505-511,934,1136-1138,1140-1144,1147-1148,1150,1153-1166,1168
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "7e3c026408787a261bdc910aa4e2785fdaf88dea",
+  "prompts": {},
+  "sessions": {
+    "s_83c07eac7f189d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f9f65-005c-7ef2-8c73-f995996ce9dc",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Francois Laberge <francoislaberge@gmail.com>"
+    }
+  }
+}
