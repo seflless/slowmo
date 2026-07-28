@@ -5,7 +5,7 @@
  * The UI is isolated in a shadow root so host-page styles cannot affect it.
  */
 
-type DockEdge =
+export type ToolbarDockEdge =
   | 'none'
   | 'left'
   | 'right'
@@ -21,7 +21,7 @@ interface Point {
   y: number;
 }
 
-interface PercentagePoint {
+export interface ToolbarPoint {
   xPct: number;
   yPct: number;
 }
@@ -33,11 +33,33 @@ interface SpeedEntry {
   whole?: number;
 }
 
-interface PersistedToolbarState {
-  position?: PercentagePoint;
-  speedIndex?: number;
-  dockEdge?: DockEdge;
-  isVertical?: boolean;
+export interface ToolbarViewState {
+  position: ToolbarPoint;
+  dockEdge: ToolbarDockEdge;
+  isVertical: boolean;
+}
+
+export type ToolbarPlacement =
+  | 'top-left'
+  | 'top-center'
+  | 'top-right'
+  | 'left'
+  | 'center'
+  | 'right'
+  | 'bottom-left'
+  | 'bottom-center'
+  | 'bottom-right'
+  | ToolbarPoint;
+
+export interface SlowmoToolbarElement extends HTMLElement {
+  close(): void;
+  destroy(): void;
+  setPlaybackState(speed: number, paused?: boolean): void;
+}
+
+export interface ToolbarClock {
+  setTimeout(callback: () => void, delay: number): number;
+  clearTimeout(handle: number): void;
 }
 
 export interface DialOptions {
@@ -47,11 +69,16 @@ export interface DialOptions {
   initialSpeed?: number;
   initialPaused?: boolean;
   layout?: 'floating' | 'inline';
+  defaultPlacement?: ToolbarPlacement;
+  initialState?: Partial<ToolbarViewState>;
+  anchor?: Element | null;
+  anchorSide?: 'top' | 'right' | 'bottom' | 'left';
+  anchorGap?: number;
+  onStateChange?: (state: ToolbarViewState) => void;
+  onClosed?: () => void;
+  clock?: ToolbarClock;
 }
 
-const STORAGE_KEY = 'slowmo-toolbar-state';
-const LEGACY_SPEED_KEY = 'slowmo-dial-speed';
-const SPEED_PRESET_VERSION = 1;
 const EDGE_THRESHOLD = 16;
 const SPEED_STEP_PIXELS = 18;
 const ONE_X_SNAP_PIXELS = 9;
@@ -80,6 +107,14 @@ const SPEEDS: SpeedEntry[] = [
 ];
 
 const ONE_X_SPEED_INDEX = 6;
+// Capture wall-clock timers before a toolbar-owned controller patches the
+// page. Toolbar affordances must remain responsive at every playback speed.
+const DEFAULT_TOOLBAR_CLOCK: ToolbarClock = {
+  setTimeout: (callback, delay) => (
+    globalThis.setTimeout(callback, delay) as unknown as number
+  ),
+  clearTimeout: (handle) => globalThis.clearTimeout(handle),
+};
 
 const TOOLBAR_CSS = `
   :host {
@@ -587,7 +622,7 @@ function createFakeCursor(): HTMLDivElement {
   return cursor;
 }
 
-function isDockEdge(value: unknown): value is DockEdge {
+export function isToolbarDockEdge(value: unknown): value is ToolbarDockEdge {
   return [
     'none',
     'left',
@@ -601,7 +636,7 @@ function isDockEdge(value: unknown): value is DockEdge {
   ].includes(String(value));
 }
 
-function isPercentagePoint(value: unknown): value is PercentagePoint {
+export function isToolbarPoint(value: unknown): value is ToolbarPoint {
   if (!value || typeof value !== 'object') return false;
   const point = value as Record<string, unknown>;
   return (
@@ -643,48 +678,83 @@ function viewportSize(): { width: number; height: number } {
   };
 }
 
-function loadState(initialSpeed: number): Required<PersistedToolbarState> {
-  const fallback: Required<PersistedToolbarState> = {
-    position: { xPct: 1, yPct: 1 },
-    speedIndex: findClosestSpeedIndex(initialSpeed),
-    dockEdge: 'bottom-right',
-    isVertical: false,
-  };
-
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as Record<string, unknown>;
-      return {
-        position: isPercentagePoint(parsed.position) ? parsed.position : fallback.position,
-        speedIndex:
-          parsed.speedPresetVersion === SPEED_PRESET_VERSION
-          && typeof parsed.speedIndex === 'number'
-          && Number.isInteger(parsed.speedIndex)
-          && parsed.speedIndex >= 0
-          && parsed.speedIndex < SPEEDS.length
-            ? parsed.speedIndex
-            : fallback.speedIndex,
-        dockEdge: isDockEdge(parsed.dockEdge) ? parsed.dockEdge : fallback.dockEdge,
-        isVertical: typeof parsed.isVertical === 'boolean' ? parsed.isVertical : fallback.isVertical,
-      };
-    }
-
-    const legacySpeed = Number.parseFloat(localStorage.getItem(LEGACY_SPEED_KEY) ?? '');
-    if (Number.isFinite(legacySpeed)) {
-      fallback.speedIndex = findClosestSpeedIndex(legacySpeed);
-    }
-  } catch {
-    // Persistence is best-effort only.
+function stateForPlacement(placement: ToolbarPlacement): ToolbarViewState {
+  if (isToolbarPoint(placement)) {
+    return {
+      position: placement,
+      dockEdge: 'none',
+      isVertical: false,
+    };
   }
 
-  return fallback;
+  const placements: Record<Exclude<ToolbarPlacement, ToolbarPoint>, ToolbarViewState> = {
+    'top-left': {
+      position: { xPct: 0, yPct: 0 },
+      dockEdge: 'top-left',
+      isVertical: false,
+    },
+    'top-center': {
+      position: { xPct: 0.5, yPct: 0 },
+      dockEdge: 'top',
+      isVertical: false,
+    },
+    'top-right': {
+      position: { xPct: 1, yPct: 0 },
+      dockEdge: 'top-right',
+      isVertical: false,
+    },
+    left: {
+      position: { xPct: 0, yPct: 0.5 },
+      dockEdge: 'left',
+      isVertical: true,
+    },
+    center: {
+      position: { xPct: 0.5, yPct: 0.5 },
+      dockEdge: 'none',
+      isVertical: false,
+    },
+    right: {
+      position: { xPct: 1, yPct: 0.5 },
+      dockEdge: 'right',
+      isVertical: true,
+    },
+    'bottom-left': {
+      position: { xPct: 0, yPct: 1 },
+      dockEdge: 'bottom-left',
+      isVertical: false,
+    },
+    'bottom-center': {
+      position: { xPct: 0.5, yPct: 1 },
+      dockEdge: 'bottom',
+      isVertical: false,
+    },
+    'bottom-right': {
+      position: { xPct: 1, yPct: 1 },
+      dockEdge: 'bottom-right',
+      isVertical: false,
+    },
+  };
+
+  return placements[placement];
 }
 
-export function createDial(options: DialOptions): HTMLElement {
+export function createDial(options: DialOptions): SlowmoToolbarElement {
+  const clock = options.clock ?? DEFAULT_TOOLBAR_CLOCK;
   const initialSpeed = options.initialSpeed && options.initialSpeed > 0 ? options.initialSpeed : 1;
-  const persisted = loadState(initialSpeed);
-  const host = document.createElement('div');
+  const fallbackState = stateForPlacement(options.defaultPlacement ?? 'bottom-right');
+  const initialState: ToolbarViewState = {
+    position: isToolbarPoint(options.initialState?.position)
+      ? options.initialState.position
+      : fallbackState.position,
+    dockEdge: isToolbarDockEdge(options.initialState?.dockEdge)
+      ? options.initialState.dockEdge
+      : fallbackState.dockEdge,
+    isVertical:
+      typeof options.initialState?.isVertical === 'boolean'
+        ? options.initialState.isVertical
+        : fallbackState.isVertical,
+  };
+  const host = document.createElement('div') as unknown as SlowmoToolbarElement;
   let layoutMode = options.layout ?? 'floating';
   host.className = 'slowmo-toolbar';
   host.setAttribute('data-slowmo-exclude', '');
@@ -714,7 +784,10 @@ export function createDial(options: DialOptions): HTMLElement {
   const speedButton = document.createElement('button');
   speedButton.className = 'pill-half speed-half';
   speedButton.type = 'button';
-  speedButton.setAttribute('aria-label', 'Drag left or right to change speed');
+  speedButton.setAttribute(
+    'aria-label',
+    'Playback speed. Drag or use arrow keys to change; Home resets to 1×.',
+  );
 
   const divider = document.createElement('span');
   divider.className = 'pill-divider';
@@ -731,20 +804,21 @@ export function createDial(options: DialOptions): HTMLElement {
   shell.append(frame, closeButton);
   shadow.appendChild(shell);
 
-  let speedIndex = persisted.speedIndex;
+  let speedIndex = findClosestSpeedIndex(initialSpeed);
   let isPlaying = !(options.initialPaused ?? false);
-  let isVertical = persisted.isVertical;
-  let dockEdge = persisted.dockEdge;
-  let position = persisted.position;
+  let isVertical = initialState.isVertical;
+  let dockEdge = initialState.dockEdge;
+  let position = initialState.position;
+  let activeAnchor = options.anchor ?? null;
   let isDragging = false;
   let didDrag = false;
   let isScrubbing = false;
   let hoverZone: 'left' | 'right' | 'dead' = 'dead';
   let overscroll = 0;
   let scrubPixelRemainder = 0;
-  let tooltipTimer: ReturnType<typeof setTimeout> | null = null;
+  let tooltipTimer: number | null = null;
   let tooltip: HTMLElement | null = null;
-  let closeTimer: ReturnType<typeof setTimeout> | null = null;
+  let closeTimer: number | null = null;
   let destroyed = false;
 
   const dragStart: Point = { x: 0, y: 0 };
@@ -759,7 +833,7 @@ export function createDial(options: DialOptions): HTMLElement {
       : { width: HORIZONTAL_SHELL_WIDTH, height: HORIZONTAL_SHELL_HEIGHT };
   }
 
-  function clampPosition(nextPosition: PercentagePoint, vertical = isVertical): PercentagePoint {
+  function clampPosition(nextPosition: ToolbarPoint, vertical = isVertical): ToolbarPoint {
     const dimensions = shellDimensions(vertical);
     const { width, height } = viewportSize();
     let x = nextPosition.xPct * width;
@@ -787,6 +861,36 @@ export function createDial(options: DialOptions): HTMLElement {
       return;
     }
 
+    if (activeAnchor?.isConnected) {
+      const rect = activeAnchor.getBoundingClientRect();
+      const dimensions = shellDimensions(false);
+      const gap = options.anchorGap ?? 12;
+      const side = options.anchorSide ?? 'bottom';
+      const center = {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      };
+
+      if (side === 'top') center.y = rect.top - gap - dimensions.height / 2;
+      if (side === 'bottom') center.y = rect.bottom + gap + dimensions.height / 2;
+      if (side === 'left') center.x = rect.left - gap - dimensions.width / 2;
+      if (side === 'right') center.x = rect.right + gap + dimensions.width / 2;
+
+      dockEdge = 'none';
+      isVertical = false;
+      const viewport = viewportSize();
+      position = {
+        xPct: viewport.width > 0 ? center.x / viewport.width : 0.5,
+        yPct: viewport.height > 0 ? center.y / viewport.height : 0.5,
+      };
+      shell.style.left = `${center.x}px`;
+      shell.style.top = `${center.y}px`;
+      shell.style.transform = 'translate(-50%, -50%)';
+      return;
+    } else if (activeAnchor) {
+      activeAnchor = null;
+    }
+
     position = clampPosition(position);
     const { width, height } = viewportSize();
     shell.style.left = `${position.xPct * width}px`;
@@ -795,17 +899,11 @@ export function createDial(options: DialOptions): HTMLElement {
   }
 
   function saveState(): void {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        speedPresetVersion: SPEED_PRESET_VERSION,
-        position,
-        speedIndex,
-        dockEdge,
-        isVertical,
-      }));
-    } catch {
-      // Persistence is best-effort only.
-    }
+    options.onStateChange?.({
+      position,
+      dockEdge,
+      isVertical,
+    });
   }
 
   function renderPlayIcon(): void {
@@ -883,13 +981,20 @@ export function createDial(options: DialOptions): HTMLElement {
   function updateSpeedIndex(nextIndex: number): void {
     speedIndex = Math.max(0, Math.min(SPEEDS.length - 1, nextIndex));
     renderSpeed();
-    saveState();
     if (isPlaying) options.onSpeedChange(selectedSpeed());
+  }
+
+  function setPlaybackState(speed: number, paused = false): void {
+    speedIndex = findClosestSpeedIndex(speed);
+    isPlaying = !paused && speed !== 0;
+    renderPlayIcon();
+    renderSpeed();
+    applySelectedSpeed();
   }
 
   function clearTooltip(): void {
     if (tooltipTimer) {
-      clearTimeout(tooltipTimer);
+      clock.clearTimeout(tooltipTimer);
       tooltipTimer = null;
     }
     tooltip?.remove();
@@ -898,7 +1003,7 @@ export function createDial(options: DialOptions): HTMLElement {
 
   function showTooltipDelayed(label: string, control: HTMLElement): void {
     clearTooltip();
-    tooltipTimer = setTimeout(() => {
+    tooltipTimer = clock.setTimeout(() => {
       if (destroyed) return;
       const rect = control.getBoundingClientRect();
       const hasRoomAbove = rect.top > 30;
@@ -935,6 +1040,7 @@ export function createDial(options: DialOptions): HTMLElement {
     event.preventDefault();
     event.stopPropagation();
     clearTooltip();
+    activeAnchor = null;
 
     if (layoutMode === 'inline') {
       const inlineRect = shell.getBoundingClientRect();
@@ -1041,7 +1147,7 @@ export function createDial(options: DialOptions): HTMLElement {
 
     isDragging = false;
     shell.classList.remove('dragging');
-    window.setTimeout(() => {
+    clock.setTimeout(() => {
       didDrag = false;
     }, 0);
   }
@@ -1135,7 +1241,7 @@ export function createDial(options: DialOptions): HTMLElement {
     scrubPixelRemainder = 0;
     speedButton.classList.remove('scrubbing');
     fakeCursor.remove();
-    window.setTimeout(() => {
+    clock.setTimeout(() => {
       overscroll = 0;
       renderSpeed();
     }, 0);
@@ -1170,12 +1276,13 @@ export function createDial(options: DialOptions): HTMLElement {
     if (destroyed) return;
     destroyed = true;
     clearTooltip();
-    if (closeTimer) clearTimeout(closeTimer);
+    if (closeTimer) clock.clearTimeout(closeTimer);
     finishScrub();
     document.removeEventListener('mousemove', handleDocumentMouseMove);
     document.removeEventListener('mouseup', handleDocumentMouseUp);
     document.removeEventListener('pointerlockchange', handlePointerLockChange);
     window.removeEventListener('resize', handleResize);
+    window.removeEventListener('scroll', handleResize);
     try {
       if (host.matches(':popover-open')) host.hidePopover();
     } catch {
@@ -1190,11 +1297,12 @@ export function createDial(options: DialOptions): HTMLElement {
     isPlaying = true;
     options.onPauseToggle?.(false);
     options.onSpeedChange(1);
+    options.onClose?.();
     frame.classList.remove('entering');
     frame.classList.add('leaving');
-    closeTimer = setTimeout(() => {
-      options.onClose?.();
+    closeTimer = clock.setTimeout(() => {
       destroy();
+      options.onClosed?.();
     }, 180);
   }
 
@@ -1243,6 +1351,21 @@ export function createDial(options: DialOptions): HTMLElement {
   speedButton.addEventListener('mouseleave', clearTooltip);
   speedButton.addEventListener('mousedown', beginSpeedScrub);
   speedButton.addEventListener('dblclick', () => updateSpeedIndex(ONE_X_SPEED_INDEX));
+  speedButton.addEventListener('keydown', (event) => {
+    let nextIndex: number | null = null;
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+      nextIndex = speedIndex - 1;
+    } else if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
+      nextIndex = speedIndex + 1;
+    } else if (event.key === 'Home') {
+      nextIndex = ONE_X_SPEED_INDEX;
+    } else if (event.key === 'End') {
+      nextIndex = SPEEDS.length - 1;
+    }
+    if (nextIndex === null) return;
+    event.preventDefault();
+    updateSpeedIndex(nextIndex);
+  });
 
   closeButton.addEventListener('mouseenter', () => {
     showTooltipDelayed('Hide the toolbar', closeButton);
@@ -1258,6 +1381,7 @@ export function createDial(options: DialOptions): HTMLElement {
   document.addEventListener('mouseup', handleDocumentMouseUp);
   document.addEventListener('pointerlockchange', handlePointerLockChange);
   window.addEventListener('resize', handleResize);
+  window.addEventListener('scroll', handleResize, { passive: true });
 
   renderPlayIcon();
   renderSpeed();
@@ -1265,9 +1389,11 @@ export function createDial(options: DialOptions): HTMLElement {
   updatePosition();
   applySelectedSpeed();
 
-  window.setTimeout(() => frame.classList.remove('entering'), 220);
+  clock.setTimeout(() => frame.classList.remove('entering'), 220);
   if (layoutMode === 'floating') queueMicrotask(elevateFloatingToolbar);
-  (host as HTMLElement & { destroy?: () => void }).destroy = destroy;
+  host.close = close;
+  host.destroy = destroy;
+  host.setPlaybackState = setPlaybackState;
 
   return host;
 }

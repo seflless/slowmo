@@ -92,9 +92,7 @@ describe('slowmo API', () => {
       expect(slowmo.getSpeed()).toBe(0);
 
       slowmo.play();
-      // Note: play() uses `currentSpeed || 1`, and since pause sets currentSpeed to 0,
-      // it defaults to 1. This is the library's actual behavior.
-      expect(slowmo.getSpeed()).toBe(1);
+      expect(slowmo.getSpeed()).toBe(0.5);
     });
 
     it('should default to 1x if paused from start', () => {

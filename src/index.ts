@@ -1,128 +1,74 @@
 /**
- * slowmo - Universal slow-motion control for web animations
+ * slowmo - reversible, universal time control for web pages.
  *
- * This library intercepts time at multiple levels to slow down (or speed up)
- * all animations on a web page.
- *
- * ## How it works:
- *
- * 1. **requestAnimationFrame patching**: We replace window.requestAnimationFrame
- *    with a wrapper that passes modified timestamps to callbacks. Time-based
- *    animations that use the timestamp parameter will automatically slow down.
- *
- * 2. **performance.now() patching**: We replace performance.now() to return
- *    virtual time. Libraries that use this for timing will be affected.
- *
- * 3. **Date.now() patching**: We replace Date.now() to return virtual epoch
- *    milliseconds. Libraries like Motion/Framer Motion use this for timing.
- *
- * 4. **setTimeout/setInterval patching**: We scale delays by inverse of speed
- *    so timed callbacks fire at the expected virtual time.
- *
- * 5. **Web Animations API**: We poll document.getAnimations() and modify the
- *    playbackRate of all Animation objects. This affects CSS animations,
- *    CSS transitions, and element.animate() calls.
- *
- * 6. **Media elements**: We set playbackRate on video/audio elements.
- *
- * ## Limitations:
- *
- * - Frame-based animations (that increment by a fixed amount per frame without
- *   using timestamps) cannot be smoothly slowed down.
- *
- * - Animations created by libraries that cache their own time references
- *   before we patch may not be affected. The Chrome extension runs at
- *   document_start to minimize this issue.
+ * Importing this module is side-effect free. A controller acquires the shared
+ * runtime only when activate() or a playback command is called, and releases
+ * its ownership with destroy().
  */
 
-let currentSpeed = 1;
-let isPaused = false;
-let isInstalled = false;
+export type SlowmoStatus = 'inactive' | 'active';
 
-// Original functions we'll patch
-let originalRAF: typeof requestAnimationFrame;
-let originalPerformanceNow: typeof performance.now;
-let originalDateNow: typeof Date.now;
-let originalSetTimeout: typeof setTimeout;
-let originalSetInterval: typeof setInterval;
-
-// Time tracking for rAF timestamp manipulation
-// We maintain "virtual time" that progresses at currentSpeed relative to real time
-let virtualTime = 0;
-let lastRealTime = 0;
-let pauseTime = 0;
-
-// Date.now tracking (epoch milliseconds, separate from performance.now)
-let virtualDateNow = 0;
-let lastRealDateNow = 0;
-let pauseDateNow = 0;
-
-/**
- * Track Animation playback rates to handle developer changes.
- *
- * The challenge: We need to multiply the developer's intended playbackRate
- * by our speed multiplier. But if we just set playbackRate, and the developer
- * also sets it, we could clobber their value or they could clobber ours.
- *
- * Solution: Track both the "original" rate (what the developer intended) and
- * what we "applied" (original * currentSpeed). On each poll:
- * - If current rate !== applied, developer changed it -> update original
- * - Then recalculate and apply: original * currentSpeed
- */
-interface TrackedAnimation {
-  original: number;  // Developer's intended playbackRate
-  applied: number;   // What we set it to (original * currentSpeed)
-}
-const trackedAnimations = new WeakMap<Animation, TrackedAnimation>();
-
-/**
- * Track media elements similarly to animations.
- * We store what rate we applied so we can detect developer changes.
- */
-interface TrackedMedia {
-  original: number;
-  applied: number;
-  wasPaused: boolean;  // Track if we paused it (vs user paused it)
-}
-const trackedMedia = new WeakMap<HTMLMediaElement, TrackedMedia>();
-
-/**
- * Get virtual (slowed) time from real time.
- *
- * Virtual time progresses at `currentSpeed` relative to real time.
- * When speed changes, we update virtualTime to the current position
- * and reset lastRealTime, so the new speed applies going forward.
- */
-function getVirtualTime(realTime: number): number {
-  if (isPaused) return pauseTime;
-  const elapsed = realTime - lastRealTime;
-  // For infinity speed, jump time forward very quickly (1000x real time)
-  const effectiveSpeed = currentSpeed === Infinity ? 1000 : currentSpeed;
-  return virtualTime + elapsed * effectiveSpeed;
+export interface SlowmoSnapshot {
+  status: SlowmoStatus;
+  speed: number;
+  paused: boolean;
 }
 
-/**
- * Get virtual Date.now() time from real Date.now() time.
- * Similar to getVirtualTime but for epoch milliseconds.
- */
-function getVirtualDateNow(realDateNow: number): number {
-  if (isPaused) return pauseDateNow;
-  const elapsed = realDateNow - lastRealDateNow;
-  const effectiveSpeed = currentSpeed === Infinity ? 1000 : currentSpeed;
-  return virtualDateNow + elapsed * effectiveSpeed;
+export type SlowmoSubscriber = (snapshot: SlowmoSnapshot) => void;
+
+export interface SlowmoWallClock {
+  setTimeout(callback: () => void, delay: number): number;
+  clearTimeout(handle: number): void;
 }
 
-/**
- * Check the element and its composed-tree ancestors for the exclusion marker.
- * Element.closest() stops at a shadow root, so explicitly continue from a
- * shadow root to its host. This keeps Slowmo's own toolbar animations at
- * real-time speed as well.
- */
+export interface SlowmoController {
+  activate(): void;
+  setSpeed(speed: number): void;
+  pause(): void;
+  play(): void;
+  reset(): void;
+  destroy(): void;
+  getSpeed(): number;
+  getSnapshot(): SlowmoSnapshot;
+  subscribe(subscriber: SlowmoSubscriber): () => void;
+}
+
+interface TrackedPlayback {
+  originalRate: number;
+  appliedRate: number;
+  pausedBySlowmo: boolean;
+}
+
+interface NativeTiming {
+  requestAnimationFrame: typeof window.requestAnimationFrame;
+  cancelAnimationFrame: typeof window.cancelAnimationFrame;
+  performanceNow: typeof performance.now;
+  performanceNowDescriptor?: PropertyDescriptor;
+  dateNow: typeof Date.now;
+  setTimeout: typeof window.setTimeout;
+  clearTimeout: typeof window.clearTimeout;
+  setInterval: typeof window.setInterval;
+}
+
+interface SharedRuntime {
+  readonly version: 1;
+  acquire(owner: symbol): void;
+  release(owner: symbol): void;
+  hasOwner(owner: symbol): boolean;
+  setSpeed(owner: symbol, speed: number): void;
+  getSpeed(): number;
+  getWallClock(): SlowmoWallClock;
+  subscribe(subscriber: SlowmoSubscriber): () => void;
+}
+
+const RUNTIME_KEY = Symbol.for('slowmo.runtime.v1');
+const DEFAULT_OWNER = Symbol.for('slowmo.default-controller.v1');
+
 function isSlowmoExcluded(element: Element): boolean {
   let current: Element | null = element;
 
   while (current) {
-    if (current.closest('[data-slowmo-exclude]')) return true;
+    if (current.closest?.('[data-slowmo-exclude]')) return true;
     const root = current.getRootNode?.();
     current =
       typeof ShadowRoot !== 'undefined' && root instanceof ShadowRoot
@@ -133,408 +79,572 @@ function isSlowmoExcluded(element: Element): boolean {
   return false;
 }
 
-/**
- * Update all Web Animations API animations.
- *
- * This handles CSS @keyframes animations, CSS transitions, and
- * animations created with element.animate(). We poll frequently
- * (every frame via rAF) to catch new animations quickly.
- *
- * CSS animations run on the compositor thread, but their Animation
- * objects are accessible from the main thread. Setting playbackRate
- * is synchronous and takes effect immediately.
- */
-function updateWebAnimations(): void {
-  if (typeof document.getAnimations !== 'function') return;
+class BrowserSlowmoRuntime implements SharedRuntime {
+  readonly version = 1 as const;
 
-  const animations = document.getAnimations();
-  for (const anim of animations) {
-    // Skip excluded elements (opt-out mechanism)
-    const effect = anim.effect as KeyframeEffect | null;
-    if (effect?.target instanceof Element) {
-      if (isSlowmoExcluded(effect.target)) continue;
-    }
+  private owners = new Map<symbol, number>();
+  private subscribers = new Set<SlowmoSubscriber>();
+  private natives: NativeTiming | null = null;
+  private installed = false;
+  private currentSpeed = 1;
+  private previousPlayingSpeed = 1;
+  private virtualTime = 0;
+  private lastRealTime = 0;
+  private virtualDateNow = 0;
+  private lastRealDateNow = 0;
+  private pollRequest: number | null = null;
+  private trackedAnimations = new Map<Animation, TrackedPlayback>();
+  private trackedMedia = new Map<HTMLMediaElement, TrackedPlayback>();
+  private gsapOriginalTimeScale: number | null = null;
 
-    // Handle infinity speed - finish animations immediately
-    if (currentSpeed === Infinity) {
-      try {
-        anim.finish();
-      } catch {
-        // Some animations can't be finished (infinite iterations)
-        // Set to max browser-supported playback rate instead
-        anim.playbackRate = 16;
-      }
-      continue;
-    }
-
-    const tracked = trackedAnimations.get(anim);
-
-    if (!tracked) {
-      // New animation - capture its current rate as the "original"
-      const original = anim.playbackRate;
-      const applied = original * currentSpeed;
-      trackedAnimations.set(anim, { original, applied });
-      anim.playbackRate = applied;
-    } else {
-      // Existing animation - check if developer changed the rate
-      if (anim.playbackRate !== tracked.applied) {
-        // Developer changed it! Treat current rate as new original.
-        // Edge case: if they set it to exactly what we would calculate,
-        // we can't distinguish, but that's rare and harmless.
-        tracked.original = anim.playbackRate;
-      }
-
-      // Recalculate and apply our speed multiplier
-      const newApplied = tracked.original * currentSpeed;
-      if (anim.playbackRate !== newApplied) {
-        anim.playbackRate = newApplied;
-        tracked.applied = newApplied;
-      }
-    }
-
-    // Handle pause state
-    if (isPaused) {
-      if (anim.playState === 'running') anim.pause();
-    } else {
-      if (anim.playState === 'paused') anim.play();
-    }
+  acquire(owner: symbol): void {
+    if (this.owners.has(owner)) return;
+    this.owners.set(owner, this.currentSpeed);
+    if (!this.installed) this.install();
+    this.emit();
   }
-}
 
-/**
- * Update all video/audio elements.
- *
- * Media elements have a playbackRate property that controls speed.
- * We track the original rate similarly to animations.
- */
-function updateMediaElements(): void {
-  const mediaElements = document.querySelectorAll('video, audio');
-  mediaElements.forEach((el) => {
-    if (isSlowmoExcluded(el)) return;
-    const media = el as HTMLMediaElement;
+  release(owner: symbol): void {
+    if (!this.owners.delete(owner)) return;
+    if (this.owners.size === 0) {
+      this.uninstall();
+      return;
+    }
+    const remainingSpeeds = [...this.owners.values()];
+    this.applySpeed(remainingSpeeds[remainingSpeeds.length - 1] ?? 1);
+  }
 
-    let tracked = trackedMedia.get(media);
+  hasOwner(owner: symbol): boolean {
+    return this.owners.has(owner);
+  }
 
-    if (!tracked) {
-      // New media element
-      tracked = {
-        original: media.playbackRate,
-        applied: media.playbackRate * currentSpeed,
-        wasPaused: false,
-      };
-      trackedMedia.set(media, tracked);
-    } else {
-      // Check if developer changed the rate
-      if (media.playbackRate !== tracked.applied && !isPaused) {
-        tracked.original = media.playbackRate;
-      }
+  getSpeed(): number {
+    return this.installed ? this.currentSpeed : 1;
+  }
+
+  getWallClock(): SlowmoWallClock {
+    return {
+      setTimeout: (callback, delay) => {
+        if (typeof window === 'undefined') {
+          return globalThis.setTimeout(callback, delay) as unknown as number;
+        }
+        const setTimeoutFunction = this.natives?.setTimeout ?? window.setTimeout;
+        return Reflect.apply(setTimeoutFunction, window, [
+          callback,
+          delay,
+        ]) as unknown as number;
+      },
+      clearTimeout: (handle) => {
+        if (typeof window === 'undefined') {
+          globalThis.clearTimeout(handle);
+          return;
+        }
+        const clearTimeoutFunction =
+          this.natives?.clearTimeout ?? window.clearTimeout;
+        Reflect.apply(clearTimeoutFunction, window, [handle]);
+      },
+    };
+  }
+
+  subscribe(subscriber: SlowmoSubscriber): () => void {
+    this.subscribers.add(subscriber);
+    return () => this.subscribers.delete(subscriber);
+  }
+
+  setSpeed(owner: symbol, speed: number): void {
+    if (!this.owners.has(owner)) return;
+    this.owners.delete(owner);
+    this.owners.set(owner, speed);
+    this.applySpeed(speed);
+  }
+
+  private applySpeed(speed: number): void {
+    if (!this.installed || !this.natives) return;
+    if (Number.isNaN(speed) || speed < 0) {
+      throw new RangeError('Slowmo speed must be a non-negative number.');
     }
 
-    // Handle infinity speed - jump to the end and remember whether Slowmo
-    // paused the media so a later finite speed can resume it.
-    if (currentSpeed === Infinity) {
-      if (media.duration && isFinite(media.duration)) {
-        media.currentTime = media.duration;
-        if (!media.paused) {
-          tracked.wasPaused = true;
+    const realNow = this.natives.performanceNow.call(performance);
+    this.virtualTime = this.getVirtualTime(realNow);
+    this.lastRealTime = realNow;
+
+    const realDateNow = this.natives.dateNow.call(Date);
+    this.virtualDateNow = this.getVirtualDateNow(realDateNow);
+    this.lastRealDateNow = realDateNow;
+
+    this.currentSpeed = speed;
+    if (speed > 0 && Number.isFinite(speed)) this.previousPlayingSpeed = speed;
+    this.updateWebAnimations();
+    this.updateMediaElements();
+    this.updateGsap();
+    this.emit();
+  }
+
+  private snapshot(): SlowmoSnapshot {
+    return {
+      status: this.installed ? 'active' : 'inactive',
+      speed: this.installed ? this.currentSpeed : 1,
+      paused: this.installed && this.currentSpeed === 0,
+    };
+  }
+
+  private emit(): void {
+    const snapshot = this.snapshot();
+    for (const subscriber of this.subscribers) subscriber(snapshot);
+  }
+
+  private effectiveSpeed(): number {
+    return this.currentSpeed === Number.POSITIVE_INFINITY ? 1000 : this.currentSpeed;
+  }
+
+  private getVirtualTime(realTime: number): number {
+    if (this.currentSpeed === 0) return this.virtualTime;
+    return this.virtualTime + (realTime - this.lastRealTime) * this.effectiveSpeed();
+  }
+
+  private getVirtualDateNow(realDateNow: number): number {
+    if (this.currentSpeed === 0) return this.virtualDateNow;
+    return this.virtualDateNow
+      + (realDateNow - this.lastRealDateNow) * this.effectiveSpeed();
+  }
+
+  private install(): void {
+    if (this.installed || typeof window === 'undefined') return;
+
+    const performanceNowDescriptor = Object.getOwnPropertyDescriptor(performance, 'now');
+    this.natives = {
+      requestAnimationFrame: window.requestAnimationFrame,
+      cancelAnimationFrame: window.cancelAnimationFrame,
+      performanceNow: performance.now,
+      performanceNowDescriptor,
+      dateNow: Date.now,
+      setTimeout: window.setTimeout,
+      clearTimeout: window.clearTimeout,
+      setInterval: window.setInterval,
+    };
+
+    this.currentSpeed = 1;
+    this.previousPlayingSpeed = 1;
+    this.lastRealTime = this.natives.performanceNow.call(performance);
+    this.virtualTime = this.lastRealTime;
+    this.lastRealDateNow = this.natives.dateNow.call(Date);
+    this.virtualDateNow = this.lastRealDateNow;
+
+    const runtime = this;
+    window.requestAnimationFrame = function slowmoRequestAnimationFrame(
+      callback: FrameRequestCallback,
+    ): number {
+      const natives = runtime.natives;
+      if (!natives) return 0;
+      return natives.requestAnimationFrame.call(window, (realTimestamp) => {
+        if (runtime.currentSpeed === 0) {
+          window.requestAnimationFrame(callback);
+          return;
         }
-        media.pause();
-      }
+        callback(runtime.getVirtualTime(realTimestamp));
+      });
+    };
+
+    Object.defineProperty(performance, 'now', {
+      configurable: true,
+      value: () => {
+        const natives = runtime.natives;
+        return natives
+          ? runtime.getVirtualTime(natives.performanceNow.call(performance))
+          : 0;
+      },
+    });
+
+    Date.now = () => {
+      const natives = runtime.natives;
+      return natives
+        ? runtime.getVirtualDateNow(natives.dateNow.call(Date))
+        : 0;
+    };
+
+    window.setTimeout = ((
+      callback: TimerHandler,
+      delay?: number,
+      ...args: unknown[]
+    ): number => {
+      const natives = runtime.natives;
+      if (!natives) return 0;
+      const effectiveSpeed = runtime.currentSpeed || 0.0001;
+      return Reflect.apply(natives.setTimeout, window, [
+        callback,
+        (delay ?? 0) / effectiveSpeed,
+        ...args,
+      ]) as unknown as number;
+    }) as typeof window.setTimeout;
+
+    window.setInterval = ((
+      callback: TimerHandler,
+      delay?: number,
+      ...args: unknown[]
+    ): number => {
+      const natives = runtime.natives;
+      if (!natives) return 0;
+      const effectiveSpeed = runtime.currentSpeed || 0.0001;
+      return Reflect.apply(natives.setInterval, window, [
+        callback,
+        (delay ?? 0) / effectiveSpeed,
+        ...args,
+      ]) as unknown as number;
+    }) as typeof window.setInterval;
+
+    this.installed = true;
+    this.poll();
+  }
+
+  private poll = (): void => {
+    if (!this.installed || !this.natives) return;
+    this.updateWebAnimations();
+    this.updateMediaElements();
+    this.pollRequest = this.natives.requestAnimationFrame.call(window, this.poll);
+  };
+
+  private updateWebAnimations(): void {
+    if (
+      typeof document === 'undefined'
+      || typeof document.getAnimations !== 'function'
+    ) {
       return;
     }
 
-    // Handle pause state
-    if (isPaused) {
-      if (!media.paused && !tracked.wasPaused) {
-        tracked.wasPaused = true;
-        media.pause();
+    for (const animation of document.getAnimations()) {
+      const effect = animation.effect as KeyframeEffect | null;
+      if (
+        effect?.target instanceof Element
+        && isSlowmoExcluded(effect.target)
+      ) {
+        continue;
       }
+
+      let tracked = this.trackedAnimations.get(animation);
+      if (!tracked) {
+        tracked = {
+          originalRate: animation.playbackRate,
+          appliedRate: animation.playbackRate,
+          pausedBySlowmo: false,
+        };
+        this.trackedAnimations.set(animation, tracked);
+      } else if (
+        this.currentSpeed !== 0
+        && animation.playbackRate !== tracked.appliedRate
+      ) {
+        tracked.originalRate = animation.playbackRate;
+      }
+
+      if (this.currentSpeed === Number.POSITIVE_INFINITY) {
+        try {
+          animation.finish();
+        } catch {
+          animation.playbackRate = 16;
+          tracked.appliedRate = 16;
+        }
+        continue;
+      }
+
+      const nextRate = tracked.originalRate * this.currentSpeed;
+      if (animation.playbackRate !== nextRate) {
+        animation.playbackRate = nextRate;
+      }
+      tracked.appliedRate = nextRate;
+
+      if (this.currentSpeed === 0) {
+        if (animation.playState === 'running') {
+          tracked.pausedBySlowmo = true;
+          animation.pause();
+        }
+      } else if (tracked.pausedBySlowmo && animation.playState === 'paused') {
+        tracked.pausedBySlowmo = false;
+        animation.play();
+      }
+    }
+  }
+
+  private updateMediaElements(): void {
+    if (typeof document === 'undefined') return;
+
+    for (const element of document.querySelectorAll('video, audio')) {
+      if (isSlowmoExcluded(element)) continue;
+      const media = element as HTMLMediaElement;
+      let tracked = this.trackedMedia.get(media);
+
+      if (!tracked) {
+        tracked = {
+          originalRate: media.playbackRate,
+          appliedRate: media.playbackRate,
+          pausedBySlowmo: false,
+        };
+        this.trackedMedia.set(media, tracked);
+      } else if (
+        this.currentSpeed !== 0
+        && media.playbackRate !== tracked.appliedRate
+      ) {
+        tracked.originalRate = media.playbackRate;
+      }
+
+      if (this.currentSpeed === Number.POSITIVE_INFINITY) {
+        if (Number.isFinite(media.duration) && media.duration > 0) {
+          media.currentTime = media.duration;
+          if (!media.paused) tracked.pausedBySlowmo = true;
+          media.pause();
+        }
+        continue;
+      }
+
+      if (this.currentSpeed === 0) {
+        if (!media.paused) {
+          tracked.pausedBySlowmo = true;
+          media.pause();
+        }
+        continue;
+      }
+
+      if (tracked.pausedBySlowmo) {
+        tracked.pausedBySlowmo = false;
+        void media.play().catch(() => undefined);
+      }
+
+      const nextRate = Math.min(
+        16,
+        Math.max(0.0625, tracked.originalRate * this.currentSpeed),
+      );
+      if (media.playbackRate !== nextRate) media.playbackRate = nextRate;
+      tracked.appliedRate = nextRate;
+    }
+  }
+
+  private updateGsap(): void {
+    const gsap = (window as typeof window & {
+      gsap?: { globalTimeline?: { timeScale(value?: number): number } };
+    }).gsap;
+    const timeline = gsap?.globalTimeline;
+    if (!timeline?.timeScale) return;
+
+    try {
+      if (this.gsapOriginalTimeScale === null) {
+        this.gsapOriginalTimeScale = timeline.timeScale();
+      }
+      timeline.timeScale(this.currentSpeed || 0.001);
+    } catch {
+      // GSAP may still be initializing.
+    }
+  }
+
+  private restoreControlledObjects(): void {
+    for (const [animation, tracked] of this.trackedAnimations) {
+      try {
+        animation.playbackRate = tracked.originalRate;
+        if (tracked.pausedBySlowmo && animation.playState === 'paused') {
+          animation.play();
+        }
+      } catch {
+        // Detached or finished animations may no longer be mutable.
+      }
+    }
+
+    for (const [media, tracked] of this.trackedMedia) {
+      try {
+        media.playbackRate = tracked.originalRate;
+        if (tracked.pausedBySlowmo) void media.play().catch(() => undefined);
+      } catch {
+        // Detached media may no longer be mutable.
+      }
+    }
+
+    if (this.gsapOriginalTimeScale !== null) {
+      try {
+        const gsap = (window as typeof window & {
+          gsap?: { globalTimeline?: { timeScale(value?: number): number } };
+        }).gsap;
+        gsap?.globalTimeline?.timeScale(this.gsapOriginalTimeScale);
+      } catch {
+        // GSAP may have been removed after activation.
+      }
+    }
+  }
+
+  private uninstall(): void {
+    if (!this.installed || !this.natives) {
+      this.currentSpeed = 1;
+      this.emit();
+      return;
+    }
+
+    const natives = this.natives;
+    this.restoreControlledObjects();
+
+    if (this.pollRequest !== null) {
+      natives.cancelAnimationFrame.call(window, this.pollRequest);
+      this.pollRequest = null;
+    }
+
+    window.requestAnimationFrame = natives.requestAnimationFrame;
+    if (natives.performanceNowDescriptor) {
+      Object.defineProperty(performance, 'now', natives.performanceNowDescriptor);
     } else {
-      if (tracked.wasPaused) {
-        tracked.wasPaused = false;
-        media.play();
-      }
-
-      // Apply speed - clamp to browser limits (typically 0.0625 to 16)
-      const newApplied = Math.min(16, Math.max(0.0625, tracked.original * currentSpeed));
-      if (media.playbackRate !== newApplied) {
-        media.playbackRate = newApplied;
-        tracked.applied = newApplied;
-      }
+      Object.defineProperty(performance, 'now', {
+        configurable: true,
+        value: natives.performanceNow,
+      });
     }
+    Date.now = natives.dateNow;
+    window.setTimeout = natives.setTimeout;
+    window.setInterval = natives.setInterval;
+
+    this.trackedAnimations.clear();
+    this.trackedMedia.clear();
+    this.gsapOriginalTimeScale = null;
+    this.natives = null;
+    this.installed = false;
+    this.currentSpeed = 1;
+    this.previousPlayingSpeed = 1;
+    this.virtualTime = 0;
+    this.lastRealTime = 0;
+    this.virtualDateNow = 0;
+    this.lastRealDateNow = 0;
+    this.emit();
+  }
+}
+
+function getSharedRuntime(): SharedRuntime {
+  if (typeof window === 'undefined') {
+    return new BrowserSlowmoRuntime();
+  }
+
+  const runtimeWindow = window as typeof window & {
+    [key: symbol]: SharedRuntime | undefined;
+  };
+  const existing = runtimeWindow[RUNTIME_KEY];
+  if (existing?.version === 1) return existing;
+
+  const runtime = new BrowserSlowmoRuntime();
+  runtimeWindow[RUNTIME_KEY] = runtime;
+  return runtime;
+}
+
+function createController(owner = Symbol('slowmo-controller')): SlowmoController {
+  const runtime = getSharedRuntime();
+  const subscribers = new Set<SlowmoSubscriber>();
+  let active = runtime.hasOwner(owner);
+  let previousPlayingSpeed = 1;
+  let unsubscribeRuntime: (() => void) | null = null;
+
+  const getSnapshot = (): SlowmoSnapshot => ({
+    status: active ? 'active' : 'inactive',
+    speed: active ? runtime.getSpeed() : 1,
+    paused: active && runtime.getSpeed() === 0,
   });
-}
 
-/**
- * Polling loop that runs every frame.
- *
- * We use requestAnimationFrame for polling because:
- * 1. It runs at display refresh rate (60fps typically)
- * 2. It's synchronized with the browser's render cycle
- * 3. New animations are most likely to appear between frames
- *
- * Note: We use the ORIGINAL rAF to avoid our own time manipulation
- * affecting the polling frequency.
- */
-function pollAnimations(): void {
-  updateWebAnimations();
-  updateMediaElements();
-  originalRAF(pollAnimations);
-}
+  const notify = (): void => {
+    const snapshot = getSnapshot();
+    for (const subscriber of subscribers) subscriber(snapshot);
+  };
 
-/**
- * Install the slowmo patches.
- *
- * This patches global functions and starts the polling loop.
- * Called automatically on import, but safe to call multiple times.
- */
-function install(): void {
-  if (isInstalled || typeof window === 'undefined') return;
-
-  // Check if extension is present - if so, we take over using its stored originals
-  const extensionPresent = (window as any).__slowmoExtension === true;
-  const storedOriginals = (window as any).__slowmoOriginals;
-
-  if (extensionPresent && storedOriginals) {
-    // Extension ran first - use its stored REAL originals (not its patches)
-    // This lets the library's code run instead of the extension's
-    console.log('⏱️ slowmo: Embedded library taking over from extension');
-    originalRAF = storedOriginals.requestAnimationFrame;
-    originalPerformanceNow = storedOriginals.performanceNow;
-    originalDateNow = storedOriginals.dateNow;
-    originalSetTimeout = storedOriginals.setTimeout;
-    originalSetInterval = storedOriginals.setInterval;
-  } else {
-    // No extension, capture current functions as originals
-    if (!originalRAF) {
-      originalRAF = window.requestAnimationFrame.bind(window);
-    }
-    if (!originalPerformanceNow) {
-      originalPerformanceNow = performance.now.bind(performance);
-    }
-    if (!originalDateNow) {
-      originalDateNow = Date.now.bind(Date);
-    }
-  }
-
-  // Initialize virtual time to current real time (if not already set)
-  if (lastRealTime === 0) {
-    lastRealTime = originalPerformanceNow();
-    virtualTime = lastRealTime;
-  }
-
-  // Initialize virtual Date.now to current real Date.now (if not already set)
-  if (lastRealDateNow === 0) {
-    lastRealDateNow = originalDateNow();
-    virtualDateNow = lastRealDateNow;
-  }
-
-  // If extension is present, we're taking over - don't skip patching
-  // Otherwise, check if another library instance already installed
-  if (!extensionPresent && (window as any).__slowmoInstalled) {
-    isInstalled = true;
-    return;
-  }
-  (window as any).__slowmoInstalled = true;
-
-  /**
-   * Patched requestAnimationFrame.
-   *
-   * We intercept the callback and pass it a modified timestamp.
-   * The timestamp is in "virtual time" which progresses at currentSpeed.
-   *
-   * For time-based animations that calculate movement from the timestamp
-   * delta, this makes them run slower/faster automatically.
-   */
-  const patchedRAF = (callback: FrameRequestCallback): number => {
-    return originalRAF((realTimestamp: number) => {
-      const virtualTimestamp = getVirtualTime(realTimestamp);
-      if (!isPaused) {
-        callback(virtualTimestamp);
-      } else {
-        // When paused, keep the animation loop alive but don't advance time.
-        // This allows instant resume when unpaused.
-        window.requestAnimationFrame(callback);
-      }
+  const subscribeToRuntime = (): void => {
+    unsubscribeRuntime ??= runtime.subscribe(() => {
+      if (active) notify();
     });
   };
+  if (active) subscribeToRuntime();
 
-  window.requestAnimationFrame = patchedRAF;
+  const controller: SlowmoController = {
+    activate() {
+      if (active) return;
+      active = true;
+      subscribeToRuntime();
+      runtime.acquire(owner);
+    },
 
-  // Also patch globalThis for ES module contexts where globals might
-  // be accessed differently
-  if (typeof globalThis !== 'undefined') {
-    (globalThis as any).requestAnimationFrame = patchedRAF;
-  }
+    setSpeed(speed) {
+      controller.activate();
+      if (speed > 0 && Number.isFinite(speed)) previousPlayingSpeed = speed;
+      runtime.setSpeed(owner, speed);
+    },
 
-  /**
-   * Patched performance.now().
-   *
-   * Returns virtual time instead of real time. Libraries that use
-   * performance.now() for timing (like some animation libraries)
-   * will automatically be affected.
-   */
-  (performance as any).now = (): number => {
-    return getVirtualTime(originalPerformanceNow());
+    pause() {
+      if (controller.getSpeed() > 0 && Number.isFinite(controller.getSpeed())) {
+        previousPlayingSpeed = controller.getSpeed();
+      }
+      controller.setSpeed(0);
+    },
+
+    play() {
+      controller.setSpeed(previousPlayingSpeed || 1);
+    },
+
+    reset() {
+      controller.setSpeed(1);
+    },
+
+    destroy() {
+      if (!active) return;
+      active = false;
+      unsubscribeRuntime?.();
+      unsubscribeRuntime = null;
+      runtime.release(owner);
+      previousPlayingSpeed = 1;
+      notify();
+    },
+
+    getSpeed() {
+      return getSnapshot().speed;
+    },
+
+    getSnapshot,
+
+    subscribe(subscriber) {
+      subscribers.add(subscriber);
+      subscriber(getSnapshot());
+      return () => subscribers.delete(subscriber);
+    },
   };
 
-  /**
-   * Patched Date.now().
-   *
-   * Returns virtual epoch time instead of real time. Many animation
-   * libraries (including Motion/Framer Motion) use Date.now() for timing.
-   */
-  Date.now = (): number => {
-    return getVirtualDateNow(originalDateNow());
-  };
+  return controller;
+}
 
-  /**
-   * Patched setTimeout/setInterval.
-   *
-   * Scales delays by inverse of speed so timed callbacks fire at the
-   * expected virtual time. At 0.5x speed, a 100ms timeout waits 200ms real time.
-   * When paused (speed=0), delays become Infinity (won't fire until resumed).
-   */
-  // Only capture if not already set (e.g., from extension's stored originals)
-  if (!originalSetTimeout) {
-    originalSetTimeout = window.setTimeout.bind(window);
-  }
-  if (!originalSetInterval) {
-    originalSetInterval = window.setInterval.bind(window);
-  }
-
-  (window as any).setTimeout = ((
-    callback: TimerHandler,
-    delay?: number,
-    ...args: any[]
-  ): number => {
-    const effectiveSpeed = currentSpeed || 0.0001; // Avoid division by zero
-    const scaledDelay = (delay ?? 0) / effectiveSpeed;
-    return originalSetTimeout(callback, scaledDelay, ...args);
-  }) as typeof setTimeout;
-
-  (window as any).setInterval = ((
-    callback: TimerHandler,
-    delay?: number,
-    ...args: any[]
-  ): number => {
-    const effectiveSpeed = currentSpeed || 0.0001; // Avoid division by zero
-    const scaledDelay = (delay ?? 0) / effectiveSpeed;
-    return originalSetInterval(callback, scaledDelay, ...args);
-  }) as typeof setInterval;
-
-  // Start polling loop using ORIGINAL rAF (not our patched version)
-  // so polling happens at real-time intervals regardless of speed
-  originalRAF(pollAnimations);
-
-  isInstalled = true;
+export function createSlowmoController(): SlowmoController {
+  return createController();
 }
 
 /**
- * Set the playback speed.
- *
- * @param speed - Speed multiplier. 0.5 = half speed, 2 = double speed, 0 = pause
- *
- * When speed changes, we "checkpoint" the virtual time:
- * - Record current virtual time position
- * - Reset lastRealTime to now
- * - New speed applies from this point forward
- *
- * This ensures smooth transitions without time jumps.
+ * Returns timers that continue on wall-clock time while Slowmo is active.
+ * Useful for debug UI that must stay responsive at very low playback speeds.
  */
-function setSpeed(speed: number): void {
-  if (!isInstalled) install();
-
-  // Checkpoint: capture current virtual time position before changing speed
-  const realNow = originalPerformanceNow();
-  virtualTime = getVirtualTime(realNow);
-  lastRealTime = realNow;
-
-  // Also checkpoint Date.now
-  const realDateNowValue = originalDateNow();
-  virtualDateNow = getVirtualDateNow(realDateNowValue);
-  lastRealDateNow = realDateNowValue;
-
-  currentSpeed = speed;
-  isPaused = speed === 0;
-
-  if (isPaused) {
-    pauseTime = virtualTime;
-    pauseDateNow = virtualDateNow;
-  }
-
-  // Immediately update all tracked animations with new speed
-  updateWebAnimations();
-  updateMediaElements();
-
-  // GSAP integration: if GSAP is loaded, use its native timeScale
-  if (typeof (window as any).gsap !== 'undefined') {
-    try {
-      (window as any).gsap.globalTimeline.timeScale(speed || 0.001);
-    } catch (e) {
-      // GSAP not fully initialized or different version
-    }
-  }
+export function getSlowmoWallClock(): SlowmoWallClock {
+  return getSharedRuntime().getWallClock();
 }
 
-/**
- * Pause all animations (equivalent to setSpeed(0))
- */
-function pause(): void {
-  setSpeed(0);
+const defaultController = createController(DEFAULT_OWNER);
+
+export interface SlowmoFunction {
+  (speed: number): void;
+  activate(): void;
+  setSpeed(speed: number): void;
+  pause(): void;
+  play(): void;
+  reset(): void;
+  destroy(): void;
+  getSpeed(): number;
+  getSnapshot(): SlowmoSnapshot;
+  subscribe(subscriber: SlowmoSubscriber): () => void;
 }
 
-/**
- * Resume at current speed (or 1x if was paused from start)
- */
-function play(): void {
-  if (isPaused) {
-    // Resume: update time tracking so virtual time continues from pause point
-    const realNow = originalPerformanceNow();
-    lastRealTime = realNow;
-    isPaused = false;
-  }
-  setSpeed(currentSpeed || 1);
-}
-
-/**
- * Reset to normal speed (1x)
- */
-function reset(): void {
-  setSpeed(1);
-}
-
-/**
- * Get current speed multiplier
- */
-function getSpeed(): number {
-  return currentSpeed;
-}
-
-/**
- * Main slowmo function - set speed directly.
- *
- * @example
- * import { slowmo } from 'slowmo';
- * slowmo(0.5);  // Half speed
- * slowmo(0.1);  // 10x slower
- * slowmo(2);    // Double speed
- * slowmo(0);    // Pause
- */
-export function slowmo(speed: number): void {
-  setSpeed(speed);
-}
-
-// Attach methods to the function for convenient API
-slowmo.setSpeed = setSpeed;
-slowmo.pause = pause;
-slowmo.play = play;
-slowmo.reset = reset;
-slowmo.getSpeed = getSpeed;
-
-// Auto-install on import in browser environments
-if (typeof window !== 'undefined') {
-  install();
-}
+export const slowmo: SlowmoFunction = Object.assign(
+  (speed: number) => defaultController.setSpeed(speed),
+  {
+    activate: () => defaultController.activate(),
+    setSpeed: (speed: number) => defaultController.setSpeed(speed),
+    pause: () => defaultController.pause(),
+    play: () => defaultController.play(),
+    reset: () => defaultController.reset(),
+    destroy: () => defaultController.destroy(),
+    getSpeed: () => defaultController.getSpeed(),
+    getSnapshot: () => defaultController.getSnapshot(),
+    subscribe: (subscriber: SlowmoSubscriber) => defaultController.subscribe(subscriber),
+  },
+);
 
 export default slowmo;

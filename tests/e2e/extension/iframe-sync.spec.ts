@@ -1,318 +1,296 @@
-import { test, expect, chromium, BrowserContext } from '@playwright/test';
-import path from 'path';
-import os from 'os';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
+import {
+  chromium,
+  expect,
+  test,
+  type BrowserContext,
+  type Page,
+  type Worker,
+} from '@playwright/test';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const extensionPath = path.resolve(__dirname, '../../../extension');
-const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'slowmo-test-'));
+const directory = path.dirname(fileURLToPath(import.meta.url));
+const extensionPath = path.resolve(directory, '../../../extension');
+const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'slowmo-extension-'));
 
-/**
- * These tests verify the Chrome extension's iframe synchronization.
- * The extension uses postMessage to sync speed changes across all frames.
- *
- * Note: These tests require headed mode (headless: false) because
- * Chrome extensions don't work in headless mode.
- *
- * IMPORTANT: These tests are semi-automated and may require manual verification
- * for complex extension behavior. The extension content script injects into
- * all frames automatically.
- */
-
-test.describe('Chrome Extension iframe sync', () => {
+test.describe('Chrome extension lifecycle', () => {
   let context: BrowserContext;
+  let worker: Worker;
 
   test.beforeAll(async () => {
-    // Launch browser with extension loaded
-    try {
-      console.log('Extension path:', extensionPath);
-      console.log('User data dir:', userDataDir);
-
-      context = await chromium.launchPersistentContext(userDataDir, {
-        headless: false,
-        channel: 'chrome',  // Use real Chrome, not Playwright's Chromium
-        args: [
-          `--disable-extensions-except=${extensionPath}`,
-          `--load-extension=${extensionPath}`,
-          '--no-first-run',
-          '--no-default-browser-check',
-          '--enable-extensions',
-        ],
-      });
-    } catch (e) {
-      console.error('Failed to launch browser with extension:', e);
-      throw e;
-    }
+    context = await chromium.launchPersistentContext(userDataDir, {
+      headless: false,
+      args: [
+        `--disable-extensions-except=${extensionPath}`,
+        `--load-extension=${extensionPath}`,
+        '--enable-extensions',
+        '--no-first-run',
+        '--no-default-browser-check',
+      ],
+    });
+    worker = context.serviceWorkers()[0]
+      ?? await context.waitForEvent('serviceworker');
   });
 
   test.afterAll(async () => {
-    if (context) {
-      await context.close();
-    }
+    await context.close();
+    fs.rmSync(userDataDir, { recursive: true, force: true });
   });
 
-  test('browser context with extension can be created', async () => {
-    // If we got here, the browser launched successfully with the extension
-    expect(context).toBeDefined();
-    const pages = context.pages();
-    // There should be at least one page (possibly about:blank)
-    expect(pages.length).toBeGreaterThanOrEqual(0);
-  });
-
-  test('can navigate to test page', async () => {
+  async function newFixturePage(): Promise<Page> {
     const page = await context.newPage();
+    await page.addInitScript(() => {
+      (window as any).__slowmoNativeRAFForTest = window.requestAnimationFrame;
+    });
+    await page.goto(
+      'http://localhost:5174/tests/fixtures/iframe-test-page.html',
+      { waitUntil: 'load' },
+    );
+    return page;
+  }
 
-    try {
-      // Set a shorter timeout for navigation
-      await page.goto('http://localhost:5174/tests/fixtures/iframe-test-page.html', {
-        timeout: 10000,
-        waitUntil: 'domcontentloaded'
-      });
+  async function getTabId(page: Page): Promise<number> {
+    await page.bringToFront();
+    const tabId = await worker.evaluate(async (url) => {
+      const tabs = await chrome.tabs.query({});
+      const matchingTab = tabs.find((candidate) => candidate.url === url);
+      const activeTab = tabs.find((candidate) => candidate.active);
+      return activeTab?.id ?? matchingTab?.id;
+    }, page.url());
+    expect(tabId).toBeTruthy();
+    return tabId!;
+  }
 
-      // Verify we're on the right page
-      const url = page.url();
-      expect(url).toContain('iframe-test-page.html');
-    } finally {
-      await page.close();
-    }
-  });
+  async function activate(page: Page): Promise<void> {
+    const tabId = await getTabId(page);
+    await worker.evaluate(async (id) => {
+      await (globalThis as any).__slowmoActivateTabForTests(id);
+    }, tabId);
+    await expect(page.locator('.slowmo-toolbar')).toHaveCount(1);
+  }
 
-  test('test page has expected elements', async () => {
-    const page = await context.newPage();
+  test('is inert before activation and fully restores every frame on close', async () => {
+    const page = await newFixturePage();
+    const child = page.frames().find((frame) => frame.url().endsWith('iframe-child.html'));
+    expect(child).toBeTruthy();
 
-    try {
-      await page.goto('http://localhost:5174/tests/fixtures/iframe-test-page.html', {
-        timeout: 10000,
-        waitUntil: 'domcontentloaded'
-      });
+    expect(await page.evaluate(() => ({
+      toolbar: document.querySelectorAll('.slowmo-toolbar').length,
+      runtime: Boolean((window as any).__slowmoExtensionRuntimeV1),
+      nativeRAF:
+        window.requestAnimationFrame === (window as any).__slowmoNativeRAFForTest,
+    }))).toEqual({ toolbar: 0, runtime: false, nativeRAF: true });
 
-      // Check for basic elements
-      const hasSpinner = await page.locator('.parent-spinner').count();
-      const hasIframe = await page.locator('#same-origin-iframe').count();
-      const hasButton = await page.locator('#add-iframe-btn').count();
+    await activate(page);
+    await expect.poll(() => page.evaluate(
+      () => Boolean((window as any).__slowmoExtensionRuntimeV1),
+    )).toBe(true);
+    await expect.poll(() => child!.evaluate(
+      () => Boolean((window as any).__slowmoExtensionRuntimeV1),
+    )).toBe(true);
 
-      expect(hasSpinner).toBe(1);
-      expect(hasIframe).toBe(1);
-      expect(hasButton).toBe(1);
-    } finally {
-      await page.close();
-    }
-  });
-
-  test('iframe-child page loads in iframe', async () => {
-    const page = await context.newPage();
-
-    try {
-      await page.goto('http://localhost:5174/tests/fixtures/iframe-test-page.html', {
-        timeout: 10000,
-        waitUntil: 'domcontentloaded'
-      });
-
-      // Wait for iframe to load
-      const frame = page.frameLocator('#same-origin-iframe');
-
-      // Check if iframe has the spinner element
-      const spinnerCount = await frame.locator('.spinner').count();
-
-      // Iframe should have loaded and contain the spinner
-      expect(spinnerCount).toBe(1);
-    } finally {
-      await page.close();
-    }
-  });
-
-  test('dynamic iframe can be added', async () => {
-    const page = await context.newPage();
-
-    try {
-      await page.goto('http://localhost:5174/tests/fixtures/iframe-test-page.html', {
-        timeout: 10000,
-        waitUntil: 'domcontentloaded'
-      });
-
-      // Click the add iframe button
-      await page.click('#add-iframe-btn');
-
-      // Wait for dynamic iframe to appear
-      await page.waitForSelector('#dynamic-iframe', { timeout: 5000 });
-
-      // Verify dynamic iframe exists
-      const dynamicIframeCount = await page.locator('#dynamic-iframe').count();
-      expect(dynamicIframeCount).toBe(1);
-    } finally {
-      await page.close();
-    }
-  });
-
-  /**
-   * NOTE: Chrome extension content script injection is unreliable in Playwright
-   * automated tests. These tests verify the extension LOADS but content script
-   * injection requires manual verification.
-   *
-   * To manually test:
-   * 1. Load extension in Chrome via chrome://extensions (Developer mode)
-   * 2. Navigate to http://localhost:5174/tests/fixtures/iframe-test-page.html
-   * 3. Verify slowmo UI appears and controls all iframes
-   */
-  test.skip('extension UI appears and can control speed', async () => {
-    const page = await context.newPage();
-
-    try {
-      await page.goto('http://localhost:5174/tests/fixtures/iframe-test-page.html', {
-        timeout: 10000,
-        waitUntil: 'load'
-      });
-
-      // Wait for extension to inject
-      await page.waitForFunction(
-        () => (window as any).__slowmoExtensionLoaded === true,
-        { timeout: 10000 }
+    const tabId = await worker.evaluate(async (url) => {
+      const tab = (await chrome.tabs.query({})).find((candidate) => candidate.url === url);
+      return tab?.id;
+    }, page.url());
+    await worker.evaluate(async (id) => {
+      await (globalThis as any).__slowmoCommandTabForTests(
+        id,
+        { command: 'set-speed', speed: 0.5 },
       );
+    }, tabId);
+    await expect.poll(() => page.evaluate(
+      () => (window as any).testHelpers.getParentAnimationPlaybackRate(),
+    )).toBe(0.5);
+    await expect.poll(() => child!.evaluate(
+      () => document.getAnimations()[0]?.playbackRate,
+    )).toBe(0.5);
 
-      // Check if slowmo function is available
-      const hasSlowmo = await page.evaluate(() => typeof (window as any).slowmo === 'function');
-      expect(hasSlowmo).toBe(true);
+    await page.locator('.slowmo-toolbar').locator('.close-button').click();
+    await expect.poll(() => page.evaluate(() => ({
+      runtime: Boolean((window as any).__slowmoExtensionRuntimeV1),
+      nativeRAF:
+        window.requestAnimationFrame === (window as any).__slowmoNativeRAFForTest,
+      rate: (window as any).testHelpers.getParentAnimationPlaybackRate(),
+    }))).toEqual({ runtime: false, nativeRAF: true, rate: 1 });
+    await expect.poll(() => child!.evaluate(() => ({
+      runtime: Boolean((window as any).__slowmoExtensionRuntimeV1),
+      rate: document.getAnimations()[0]?.playbackRate,
+    }))).toEqual({ runtime: false, rate: 1 });
 
-      // Set speed to 0.5x
-      await page.evaluate(() => window.slowmo(0.5));
-
-      // Wait for speed to apply
-      await page.waitForTimeout(200);
-
-      // Check parent animation playbackRate
-      const parentRate = await page.evaluate(() => {
-        return window.testHelpers.getParentAnimationPlaybackRate();
-      });
-      expect(parentRate).toBe(0.5);
-    } finally {
-      await page.close();
-    }
+    await page.close();
   });
 
-  test.skip('speed change propagates to same-origin iframe', async () => {
-    const page = await context.newPage();
+  test('reopens at 1x and reloads into an inactive document', async () => {
+    const page = await newFixturePage();
+    await activate(page);
+    await page.evaluate(() => {
+      document.dispatchEvent(new CustomEvent('slowmo-extension-command-v1', {
+        detail: { command: 'set-speed', speed: 8 },
+      }));
+    });
+    await page.locator('.slowmo-toolbar').locator('.close-button').click();
 
-    try {
-      await page.goto('http://localhost:5174/tests/fixtures/iframe-test-page.html', {
-        timeout: 10000,
-        waitUntil: 'domcontentloaded'
-      });
+    await activate(page);
+    await expect(
+      page.locator('.slowmo-toolbar').locator('.speed-half'),
+    ).toHaveText('1×');
 
-      // Wait for extension to load
-      await page.waitForFunction(() => (window as any).__slowmoExtensionLoaded === true, { timeout: 5000 });
+    await page.reload({ waitUntil: 'load' });
+    await expect(page.locator('.slowmo-toolbar')).toHaveCount(0);
+    expect(await page.evaluate(
+      () => Boolean((window as any).__slowmoExtensionRuntimeV1),
+    )).toBe(false);
 
-      // Set speed to 0.25x
-      await page.evaluate(() => (window as any).slowmo(0.25));
-
-      // Wait for sync to propagate
-      await page.waitForTimeout(300);
-
-      // Check iframe animation playbackRate
-      const iframeRate = await page.evaluate(() => {
-        return window.testHelpers.getSameOriginIframePlaybackRate();
-      });
-      expect(iframeRate).toBe(0.25);
-    } finally {
-      await page.close();
-    }
+    await page.close();
   });
 
-  test.skip('speed change propagates to dynamically added iframe', async () => {
-    const page = await context.newPage();
+  test('re-triggering an open toolbar resets both UI and runtime to 1x', async () => {
+    const page = await newFixturePage();
+    await activate(page);
+    const speedButton = page.locator('.slowmo-toolbar').locator('.speed-half');
+    await speedButton.press('ArrowRight');
+    await speedButton.press('ArrowRight');
+    await speedButton.press('ArrowRight');
+    await expect(speedButton).toHaveText('8×');
+    await expect.poll(() => page.evaluate(
+      () => (window as any).testHelpers.getParentAnimationPlaybackRate(),
+    )).toBe(8);
 
-    try {
-      await page.goto('http://localhost:5174/tests/fixtures/iframe-test-page.html', {
-        timeout: 10000,
-        waitUntil: 'domcontentloaded'
-      });
+    await activate(page);
 
-      // Wait for extension to load
-      await page.waitForFunction(() => (window as any).__slowmoExtensionLoaded === true, { timeout: 5000 });
-
-      // Set speed to 0.5x BEFORE adding iframe
-      await page.evaluate(() => (window as any).slowmo(0.5));
-      await page.waitForTimeout(200);
-
-      // Add dynamic iframe
-      await page.click('#add-iframe-btn');
-      await page.waitForSelector('#dynamic-iframe', { timeout: 5000 });
-
-      // Wait for MutationObserver to catch it and sync
-      await page.waitForTimeout(500);
-
-      // Check dynamic iframe animation playbackRate
-      const dynamicRate = await page.evaluate(() => {
-        return window.testHelpers.getDynamicIframePlaybackRate();
-      });
-      expect(dynamicRate).toBe(0.5);
-    } finally {
-      await page.close();
-    }
+    await expect(speedButton).toHaveText('1×');
+    await expect.poll(() => page.evaluate(
+      () => (window as any).testHelpers.getParentAnimationPlaybackRate(),
+    )).toBe(1);
+    await page.close();
   });
 
-  test.skip('pause propagates to all frames', async () => {
-    const page = await context.newPage();
+  test('injects newly created child frames during an active session', async () => {
+    const page = await newFixturePage();
+    await activate(page);
+    const frameAttached = page.waitForEvent('frameattached');
+    await page.click('#add-iframe-btn');
+    const dynamicFrame = await frameAttached;
+    await dynamicFrame.waitForLoadState('load');
 
-    try {
-      await page.goto('http://localhost:5174/tests/fixtures/iframe-test-page.html', {
-        timeout: 10000,
-        waitUntil: 'domcontentloaded'
-      });
+    await expect.poll(() => dynamicFrame.evaluate(
+      () => Boolean((window as any).__slowmoExtensionRuntimeV1),
+    )).toBe(true);
 
-      // Wait for extension to load
-      await page.waitForFunction(() => (window as any).__slowmoExtensionLoaded === true, { timeout: 5000 });
-
-      // Pause (speed = 0)
-      await page.evaluate(() => (window as any).slowmo(0));
-      await page.waitForTimeout(300);
-
-      // Check parent is paused
-      const parentRate = await page.evaluate(() => {
-        return window.testHelpers.getParentAnimationPlaybackRate();
-      });
-      expect(parentRate).toBe(0);
-
-      // Check iframe is paused
-      const iframeRate = await page.evaluate(() => {
-        return window.testHelpers.getSameOriginIframePlaybackRate();
-      });
-      expect(iframeRate).toBe(0);
-    } finally {
-      await page.close();
-    }
+    await page.close();
   });
 
-  test.skip('multiple speed changes sync correctly', async () => {
+  test('synchronizes a dynamically created cross-origin frame', async () => {
+    const page = await newFixturePage();
+    await activate(page);
+    const frameAttached = page.waitForEvent('frameattached');
+    await page.evaluate(() => {
+      const frame = document.createElement('iframe');
+      frame.id = 'cross-origin-frame';
+      frame.src = 'http://localhost:5184/tests/fixtures/plain-iframe.html';
+      document.body.appendChild(frame);
+    });
+    const crossOriginFrame = await frameAttached;
+    await crossOriginFrame.waitForLoadState('load');
+
+    await expect.poll(() => crossOriginFrame.evaluate(
+      () => Boolean((window as any).__slowmoExtensionRuntimeV1),
+    )).toBe(true);
+
+    await page.locator('.slowmo-toolbar').locator('.play-half').click();
+    await expect.poll(() => crossOriginFrame.evaluate(
+      () => ({
+        speed: (window as any).__slowmoExtensionRuntimeV1?.controller.getSpeed(),
+        playState: document.getAnimations()[0]?.playState,
+      }),
+    )).toEqual({ speed: 0, playState: 'paused' });
+
+    await page.close();
+  });
+
+  test('synchronizes nested frames', async () => {
     const page = await context.newPage();
+    await page.goto(
+      'http://localhost:5174/tests/fixtures/extension-test.html',
+      { waitUntil: 'load' },
+    );
+    await activate(page);
+    const nestedFrame = page.frames().find(
+      (frame) => frame.url().endsWith('plain-iframe-inner.html'),
+    );
+    expect(nestedFrame).toBeTruthy();
 
-    try {
-      await page.goto('http://localhost:5174/tests/fixtures/iframe-test-page.html', {
-        timeout: 10000,
-        waitUntil: 'domcontentloaded'
-      });
+    await page.locator('.slowmo-toolbar').locator('.speed-half').press('ArrowRight');
 
-      // Wait for extension to load
-      await page.waitForFunction(() => (window as any).__slowmoExtensionLoaded === true, { timeout: 5000 });
+    await expect.poll(() => nestedFrame!.evaluate(() => ({
+      runtime: Boolean((window as any).__slowmoExtensionRuntimeV1),
+      rate: document.getAnimations()[0]?.playbackRate,
+    }))).toEqual({ runtime: true, rate: 2 });
+    await page.close();
+  });
 
-      // Test multiple speed changes
-      const speeds = [0.5, 0.25, 2, 1];
-      for (const speed of speeds) {
-        await page.evaluate((s) => (window as any).slowmo(s), speed);
-        await page.waitForTimeout(200);
+  test('keeps tab sessions independent', async () => {
+    const firstPage = await newFixturePage();
+    const secondPage = await newFixturePage();
+    await activate(firstPage);
+    await firstPage.locator('.slowmo-toolbar').locator('.speed-half').press('ArrowRight');
+    await expect.poll(() => firstPage.evaluate(
+      () => (window as any).testHelpers.getParentAnimationPlaybackRate(),
+    )).toBe(2);
+    expect(await secondPage.evaluate(
+      () => Boolean((window as any).__slowmoExtensionRuntimeV1),
+    )).toBe(false);
 
-        const parentRate = await page.evaluate(() => {
-          return window.testHelpers.getParentAnimationPlaybackRate();
-        });
-        const iframeRate = await page.evaluate(() => {
-          return window.testHelpers.getSameOriginIframePlaybackRate();
-        });
+    await activate(secondPage);
+    const secondSpeed = secondPage.locator('.slowmo-toolbar').locator('.speed-half');
+    await secondSpeed.press('ArrowRight');
+    await secondSpeed.press('ArrowRight');
+    await expect.poll(() => secondPage.evaluate(
+      () => (window as any).testHelpers.getParentAnimationPlaybackRate(),
+    )).toBe(4);
+    expect(await firstPage.evaluate(
+      () => (window as any).testHelpers.getParentAnimationPlaybackRate(),
+    )).toBe(2);
 
-        expect(parentRate).toBe(speed);
-        expect(iframeRate).toBe(speed);
-      }
-    } finally {
-      await page.close();
-    }
+    await firstPage.close();
+    await secondPage.close();
+  });
+
+  test('renders on a page that requires Trusted Types', async () => {
+    const page = await context.newPage();
+    await page.goto(
+      'http://localhost:5174/tests/fixtures/trusted-types-page.html',
+      { waitUntil: 'load' },
+    );
+
+    await activate(page);
+
+    await expect(page.locator('.slowmo-toolbar')).toHaveCount(1);
+    await expect(page.locator('.slowmo-toolbar').locator('.close-button')).toBeVisible();
+    await page.close();
+  });
+
+  test('stays inactive and marks restricted Chrome pages', async () => {
+    const page = await context.newPage();
+    await page.goto('chrome://version', { waitUntil: 'load' });
+    const tabId = await getTabId(page);
+
+    await worker.evaluate(async (id) => {
+      await (globalThis as any).__slowmoActivateTabForTests(id);
+    }, tabId);
+
+    const active = await worker.evaluate(async (id) => {
+      const key = `slowmo-active-tab:${id}`;
+      return typeof (await chrome.storage.session.get(key))[key] === 'string';
+    }, tabId);
+    expect(active).toBe(false);
+    expect(await worker.evaluate(
+      async (id) => chrome.action.getBadgeText({ tabId: id }),
+      tabId,
+    )).toBe('!');
+    await page.close();
   });
 });

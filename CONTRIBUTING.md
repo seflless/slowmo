@@ -7,27 +7,33 @@ Thanks for your interest in contributing!
 ```bash
 git clone https://github.com/seflless/slowmo.git
 cd slowmo
-npm install
-npm run dev
+bun install
+bun run dev
 ```
 
 ## Testing the Chrome Extension
 
-1. Open Chrome and navigate to `chrome://extensions`
-2. Enable **Developer mode** (toggle in top-right)
-3. Click **Load unpacked**
-4. Select the `extension/` folder from this repo
-5. The slowmo icon should appear in your extensions bar
+1. Build generated runtime and toolbar bundles:
 
-To test:
-- Visit any website with animations
-- Look for the amber clock icon in the bottom-right corner
-- Click it to expand the speed controls
-- Try different speeds and the skip (∞) button
+   ```bash
+   bun run build:ext
+   ```
 
-To reload after code changes:
-- Go to `chrome://extensions`
-- Click the refresh icon on the slowmo card
+2. Open `chrome://extensions`, enable Developer mode, and choose **Load
+   unpacked**.
+3. Select the `extension/` directory.
+4. Visit a normal page. Confirm Slowmo is absent and native timing is unchanged.
+5. Click the extension icon or use its assigned shortcut.
+6. Test scrubbing, pause, dragging/docking, Close, clean 1× reopening, and an
+   inactive reload.
+
+After source changes, rebuild and click Reload on the extension card.
+
+Run the automated real-browser lifecycle suite with:
+
+```bash
+bun run test:e2e:extension
+```
 
 ## Project Structure
 
@@ -37,7 +43,9 @@ slowmo/
 │   ├── index.ts        # Core slowmo API
 │   ├── dial.ts         # Dial component internals
 │   ├── dial-api.ts     # Dial public API (setupDial/shutdownDial)
+│   ├── toolbar.ts      # Canonical toolbar host API
 │   ├── react.tsx       # React <Slowmo /> component
+│   ├── extension/      # Extension runtime, toolbar host, worker, and protocol
 │   ├── recreate.ts     # AI animation recreation
 │   └── cli/            # CLI tools
 ├── demo/               # Demo website
@@ -51,13 +59,17 @@ slowmo/
 ## Running Tests
 
 ```bash
-npm test
+bun run test:unit
+bun run test:e2e
+bun run test:e2e:extension
+bun run typecheck
 ```
 
 ## Code Style
 
 - TypeScript for the library
-- Vanilla JS for the extension (to avoid build step)
+- Framework-independent core and toolbar; React remains an optional entry point
+- Extension source is TypeScript and generated bundles are committed for upload
 - Keep bundle size minimal
 
 ## Pull Requests

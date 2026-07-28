@@ -124,6 +124,75 @@ describe('dial-api', () => {
 
       document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
     });
+
+    it('snaps back to the sticky 1x preset while scrubbing', () => {
+      const toolbar = setupDial();
+      const speedButton = toolbar?.shadowRoot
+        ?.querySelector<HTMLButtonElement>('.speed-half');
+      const move = (movementX: number) => {
+        const event = new MouseEvent('mousemove', { bubbles: true });
+        Object.defineProperty(event, 'movementX', { value: movementX });
+        document.dispatchEvent(event);
+      };
+
+      speedButton?.dispatchEvent(new MouseEvent('mousedown', {
+        bubbles: true,
+        button: 0,
+        clientX: 100,
+        clientY: 20,
+      }));
+      move(18);
+      expect(speedButton?.textContent).toBe('2×');
+      move(-9);
+      expect(speedButton?.textContent).toBe('1×');
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    });
+
+    it('shows elastic overscroll at the end of the preset range', () => {
+      const toolbar = setupDial();
+      const speedButton = toolbar?.shadowRoot
+        ?.querySelector<HTMLButtonElement>('.speed-half');
+
+      for (let index = 0; index < 6; index += 1) {
+        speedButton?.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'ArrowLeft',
+          bubbles: true,
+        }));
+      }
+      speedButton?.dispatchEvent(new MouseEvent('mousedown', {
+        bubbles: true,
+        button: 0,
+        clientX: 100,
+        clientY: 20,
+      }));
+      const event = new MouseEvent('mousemove', { bubbles: true });
+      Object.defineProperty(event, 'movementX', { value: -18 });
+      document.dispatchEvent(event);
+
+      const transform = speedButton
+        ?.querySelector<HTMLElement>('.speed-readout')
+        ?.style.transform;
+      expect(Number.parseFloat(transform?.match(/-?[\d.]+/)?.[0] ?? '0'))
+        .toBeCloseTo(-2.7);
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    });
+
+    it('resets playback to 1x on double click', () => {
+      const toolbar = setupDial();
+      const speedButton = toolbar?.shadowRoot
+        ?.querySelector<HTMLButtonElement>('.speed-half');
+
+      for (let index = 0; index < 3; index += 1) {
+        speedButton?.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'ArrowRight',
+          bubbles: true,
+        }));
+      }
+      expect(speedButton?.textContent).toBe('8×');
+
+      speedButton?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+      expect(speedButton?.textContent).toBe('1×');
+    });
   });
 
   describe('shutdownDial()', () => {

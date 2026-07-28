@@ -156,7 +156,7 @@
       </header>
 
       <h1>Privacy Policy</h1>
-      <p class="last-updated">Last updated: February 2025</p>
+      <p class="last-updated">Last updated: July 2026</p>
 
       <p class="intro">
         slowmo is a browser extension that controls animation and video playback speed on web pages. Your privacy matters to us.
@@ -173,19 +173,22 @@
       </ul>
 
       <h2>Local Storage</h2>
-      <p>The extension stores only one piece of data locally on your device:</p>
+      <p>The extension stores only interface state locally on your device:</p>
       <ul>
-        <li>The Slowmo toolbar's position, orientation, and selected speed</li>
+        <li>The Slowmo toolbar's position and orientation</li>
+        <li>Temporary active-tab bookkeeping, removed on close or navigation</li>
       </ul>
       <p>This data never leaves your browser.</p>
 
       <h2>Permissions</h2>
       <p>The extension requests these permissions:</p>
       <ul>
-        <li><code>activeTab</code> and <code>scripting</code>: To inject the slowmo script into web pages</li>
-        <li><code>&lt;all_urls&gt;</code>: To work on any website you visit</li>
+        <li><code>activeTab</code> and <code>scripting</code>: To activate Slowmo after you invoke it</li>
+        <li><code>webNavigation</code>: To include new embedded frames during an active session</li>
+        <li><code>storage</code>: To remember toolbar placement and temporary session state</li>
+        <li><code>&lt;all_urls&gt;</code>: To reach eligible embedded frames on sites where you invoke Slowmo</li>
       </ul>
-      <p>These permissions are used solely to modify animation timing on the current page. No data is collected or transmitted.</p>
+      <p>Slowmo is inactive until you click its icon or use its assigned shortcut. These permissions are used solely to modify animation timing in that current tab. No data is collected or transmitted.</p>
 
       <h2>Contact</h2>
       <p>For questions about this privacy policy, visit <a href="https://github.com/seflless/slowmo">github.com/seflless/slowmo</a></p>

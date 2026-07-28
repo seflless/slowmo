@@ -1,262 +1,5 @@
 (function() {
   "use strict";
-  var _a;
-  let currentSpeed = 1;
-  let isPaused = false;
-  let isInstalled = false;
-  let originalRAF;
-  let originalPerformanceNow;
-  let originalDateNow;
-  let originalSetTimeout;
-  let originalSetInterval;
-  let virtualTime = 0;
-  let lastRealTime = 0;
-  let pauseTime = 0;
-  let virtualDateNow = 0;
-  let lastRealDateNow = 0;
-  let pauseDateNow = 0;
-  const trackedAnimations = /* @__PURE__ */ new WeakMap();
-  const trackedMedia = /* @__PURE__ */ new WeakMap();
-  function getVirtualTime(realTime) {
-    if (isPaused) return pauseTime;
-    const elapsed = realTime - lastRealTime;
-    const effectiveSpeed = currentSpeed === Infinity ? 1e3 : currentSpeed;
-    return virtualTime + elapsed * effectiveSpeed;
-  }
-  function getVirtualDateNow(realDateNow) {
-    if (isPaused) return pauseDateNow;
-    const elapsed = realDateNow - lastRealDateNow;
-    const effectiveSpeed = currentSpeed === Infinity ? 1e3 : currentSpeed;
-    return virtualDateNow + elapsed * effectiveSpeed;
-  }
-  function isSlowmoExcluded(element) {
-    var _a2;
-    let current = element;
-    while (current) {
-      if (current.closest("[data-slowmo-exclude]")) return true;
-      const root = (_a2 = current.getRootNode) == null ? void 0 : _a2.call(current);
-      current = typeof ShadowRoot !== "undefined" && root instanceof ShadowRoot ? root.host : null;
-    }
-    return false;
-  }
-  function updateWebAnimations() {
-    if (typeof document.getAnimations !== "function") return;
-    const animations = document.getAnimations();
-    for (const anim of animations) {
-      const effect = anim.effect;
-      if ((effect == null ? void 0 : effect.target) instanceof Element) {
-        if (isSlowmoExcluded(effect.target)) continue;
-      }
-      if (currentSpeed === Infinity) {
-        try {
-          anim.finish();
-        } catch {
-          anim.playbackRate = 16;
-        }
-        continue;
-      }
-      const tracked = trackedAnimations.get(anim);
-      if (!tracked) {
-        const original = anim.playbackRate;
-        const applied = original * currentSpeed;
-        trackedAnimations.set(anim, { original, applied });
-        anim.playbackRate = applied;
-      } else {
-        if (anim.playbackRate !== tracked.applied) {
-          tracked.original = anim.playbackRate;
-        }
-        const newApplied = tracked.original * currentSpeed;
-        if (anim.playbackRate !== newApplied) {
-          anim.playbackRate = newApplied;
-          tracked.applied = newApplied;
-        }
-      }
-      if (isPaused) {
-        if (anim.playState === "running") anim.pause();
-      } else {
-        if (anim.playState === "paused") anim.play();
-      }
-    }
-  }
-  function updateMediaElements() {
-    const mediaElements = document.querySelectorAll("video, audio");
-    mediaElements.forEach((el) => {
-      if (isSlowmoExcluded(el)) return;
-      const media = el;
-      let tracked = trackedMedia.get(media);
-      if (!tracked) {
-        tracked = {
-          original: media.playbackRate,
-          applied: media.playbackRate * currentSpeed,
-          wasPaused: false
-        };
-        trackedMedia.set(media, tracked);
-      } else {
-        if (media.playbackRate !== tracked.applied && !isPaused) {
-          tracked.original = media.playbackRate;
-        }
-      }
-      if (currentSpeed === Infinity) {
-        if (media.duration && isFinite(media.duration)) {
-          media.currentTime = media.duration;
-          if (!media.paused) {
-            tracked.wasPaused = true;
-          }
-          media.pause();
-        }
-        return;
-      }
-      if (isPaused) {
-        if (!media.paused && !tracked.wasPaused) {
-          tracked.wasPaused = true;
-          media.pause();
-        }
-      } else {
-        if (tracked.wasPaused) {
-          tracked.wasPaused = false;
-          media.play();
-        }
-        const newApplied = Math.min(16, Math.max(0.0625, tracked.original * currentSpeed));
-        if (media.playbackRate !== newApplied) {
-          media.playbackRate = newApplied;
-          tracked.applied = newApplied;
-        }
-      }
-    });
-  }
-  function pollAnimations() {
-    updateWebAnimations();
-    updateMediaElements();
-    originalRAF(pollAnimations);
-  }
-  function install() {
-    if (isInstalled || typeof window === "undefined") return;
-    const extensionPresent = window.__slowmoExtension === true;
-    const storedOriginals = window.__slowmoOriginals;
-    if (extensionPresent && storedOriginals) {
-      console.log("⏱️ slowmo: Embedded library taking over from extension");
-      originalRAF = storedOriginals.requestAnimationFrame;
-      originalPerformanceNow = storedOriginals.performanceNow;
-      originalDateNow = storedOriginals.dateNow;
-      originalSetTimeout = storedOriginals.setTimeout;
-      originalSetInterval = storedOriginals.setInterval;
-    } else {
-      if (!originalRAF) {
-        originalRAF = window.requestAnimationFrame.bind(window);
-      }
-      if (!originalPerformanceNow) {
-        originalPerformanceNow = performance.now.bind(performance);
-      }
-      if (!originalDateNow) {
-        originalDateNow = Date.now.bind(Date);
-      }
-    }
-    if (lastRealTime === 0) {
-      lastRealTime = originalPerformanceNow();
-      virtualTime = lastRealTime;
-    }
-    if (lastRealDateNow === 0) {
-      lastRealDateNow = originalDateNow();
-      virtualDateNow = lastRealDateNow;
-    }
-    if (!extensionPresent && window.__slowmoInstalled) {
-      isInstalled = true;
-      return;
-    }
-    window.__slowmoInstalled = true;
-    const patchedRAF = (callback) => {
-      return originalRAF((realTimestamp) => {
-        const virtualTimestamp = getVirtualTime(realTimestamp);
-        if (!isPaused) {
-          callback(virtualTimestamp);
-        } else {
-          window.requestAnimationFrame(callback);
-        }
-      });
-    };
-    window.requestAnimationFrame = patchedRAF;
-    if (typeof globalThis !== "undefined") {
-      globalThis.requestAnimationFrame = patchedRAF;
-    }
-    performance.now = () => {
-      return getVirtualTime(originalPerformanceNow());
-    };
-    Date.now = () => {
-      return getVirtualDateNow(originalDateNow());
-    };
-    if (!originalSetTimeout) {
-      originalSetTimeout = window.setTimeout.bind(window);
-    }
-    if (!originalSetInterval) {
-      originalSetInterval = window.setInterval.bind(window);
-    }
-    window.setTimeout = (callback, delay, ...args) => {
-      const effectiveSpeed = currentSpeed || 1e-4;
-      const scaledDelay = (delay ?? 0) / effectiveSpeed;
-      return originalSetTimeout(callback, scaledDelay, ...args);
-    };
-    window.setInterval = (callback, delay, ...args) => {
-      const effectiveSpeed = currentSpeed || 1e-4;
-      const scaledDelay = (delay ?? 0) / effectiveSpeed;
-      return originalSetInterval(callback, scaledDelay, ...args);
-    };
-    originalRAF(pollAnimations);
-    isInstalled = true;
-  }
-  function setSpeed(speed) {
-    if (!isInstalled) install();
-    const realNow = originalPerformanceNow();
-    virtualTime = getVirtualTime(realNow);
-    lastRealTime = realNow;
-    const realDateNowValue = originalDateNow();
-    virtualDateNow = getVirtualDateNow(realDateNowValue);
-    lastRealDateNow = realDateNowValue;
-    currentSpeed = speed;
-    isPaused = speed === 0;
-    if (isPaused) {
-      pauseTime = virtualTime;
-      pauseDateNow = virtualDateNow;
-    }
-    updateWebAnimations();
-    updateMediaElements();
-    if (typeof window.gsap !== "undefined") {
-      try {
-        window.gsap.globalTimeline.timeScale(speed || 1e-3);
-      } catch (e) {
-      }
-    }
-  }
-  function pause() {
-    setSpeed(0);
-  }
-  function play() {
-    if (isPaused) {
-      const realNow = originalPerformanceNow();
-      lastRealTime = realNow;
-      isPaused = false;
-    }
-    setSpeed(currentSpeed || 1);
-  }
-  function reset() {
-    setSpeed(1);
-  }
-  function getSpeed() {
-    return currentSpeed;
-  }
-  function slowmo(speed) {
-    setSpeed(speed);
-  }
-  slowmo.setSpeed = setSpeed;
-  slowmo.pause = pause;
-  slowmo.play = play;
-  slowmo.reset = reset;
-  slowmo.getSpeed = getSpeed;
-  if (typeof window !== "undefined") {
-    install();
-  }
-  const STORAGE_KEY = "slowmo-toolbar-state";
-  const LEGACY_SPEED_KEY = "slowmo-dial-speed";
-  const SPEED_PRESET_VERSION = 1;
   const EDGE_THRESHOLD = 16;
   const SPEED_STEP_PIXELS = 18;
   const ONE_X_SNAP_PIXELS = 9;
@@ -279,6 +22,10 @@
     { value: Number.POSITIVE_INFINITY, whole: Number.POSITIVE_INFINITY }
   ];
   const ONE_X_SPEED_INDEX = 6;
+  const DEFAULT_TOOLBAR_CLOCK = {
+    setTimeout: (callback, delay) => globalThis.setTimeout(callback, delay),
+    clearTimeout: (handle) => globalThis.clearTimeout(handle)
+  };
   const TOOLBAR_CSS = `
   :host {
     all: initial;
@@ -774,7 +521,7 @@
     cursor.appendChild(svg);
     return cursor;
   }
-  function isDockEdge(value) {
+  function isToolbarDockEdge(value) {
     return [
       "none",
       "left",
@@ -787,7 +534,7 @@
       "bottom-right"
     ].includes(String(value));
   }
-  function isPercentagePoint(value) {
+  function isToolbarPoint(value) {
     if (!value || typeof value !== "object") return false;
     const point = value;
     return typeof point.xPct === "number" && typeof point.yPct === "number" && Number.isFinite(point.xPct) && Number.isFinite(point.yPct) && point.xPct >= 0 && point.xPct <= 1 && point.yPct >= 0 && point.yPct <= 1;
@@ -815,35 +562,73 @@
       height: (root == null ? void 0 : root.clientHeight) || window.innerHeight
     };
   }
-  function loadState(initialSpeed) {
-    const fallback = {
-      position: { xPct: 1, yPct: 1 },
-      speedIndex: findClosestSpeedIndex(initialSpeed),
-      dockEdge: "bottom-right",
-      isVertical: false
-    };
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        return {
-          position: isPercentagePoint(parsed.position) ? parsed.position : fallback.position,
-          speedIndex: parsed.speedPresetVersion === SPEED_PRESET_VERSION && typeof parsed.speedIndex === "number" && Number.isInteger(parsed.speedIndex) && parsed.speedIndex >= 0 && parsed.speedIndex < SPEEDS.length ? parsed.speedIndex : fallback.speedIndex,
-          dockEdge: isDockEdge(parsed.dockEdge) ? parsed.dockEdge : fallback.dockEdge,
-          isVertical: typeof parsed.isVertical === "boolean" ? parsed.isVertical : fallback.isVertical
-        };
-      }
-      const legacySpeed = Number.parseFloat(localStorage.getItem(LEGACY_SPEED_KEY) ?? "");
-      if (Number.isFinite(legacySpeed)) {
-        fallback.speedIndex = findClosestSpeedIndex(legacySpeed);
-      }
-    } catch {
+  function stateForPlacement(placement) {
+    if (isToolbarPoint(placement)) {
+      return {
+        position: placement,
+        dockEdge: "none",
+        isVertical: false
+      };
     }
-    return fallback;
+    const placements = {
+      "top-left": {
+        position: { xPct: 0, yPct: 0 },
+        dockEdge: "top-left",
+        isVertical: false
+      },
+      "top-center": {
+        position: { xPct: 0.5, yPct: 0 },
+        dockEdge: "top",
+        isVertical: false
+      },
+      "top-right": {
+        position: { xPct: 1, yPct: 0 },
+        dockEdge: "top-right",
+        isVertical: false
+      },
+      left: {
+        position: { xPct: 0, yPct: 0.5 },
+        dockEdge: "left",
+        isVertical: true
+      },
+      center: {
+        position: { xPct: 0.5, yPct: 0.5 },
+        dockEdge: "none",
+        isVertical: false
+      },
+      right: {
+        position: { xPct: 1, yPct: 0.5 },
+        dockEdge: "right",
+        isVertical: true
+      },
+      "bottom-left": {
+        position: { xPct: 0, yPct: 1 },
+        dockEdge: "bottom-left",
+        isVertical: false
+      },
+      "bottom-center": {
+        position: { xPct: 0.5, yPct: 1 },
+        dockEdge: "bottom",
+        isVertical: false
+      },
+      "bottom-right": {
+        position: { xPct: 1, yPct: 1 },
+        dockEdge: "bottom-right",
+        isVertical: false
+      }
+    };
+    return placements[placement];
   }
   function createDial(options) {
-    const initialSpeed = options.initialSpeed;
-    const persisted = loadState(initialSpeed);
+    var _a, _b, _c;
+    const clock = options.clock ?? DEFAULT_TOOLBAR_CLOCK;
+    const initialSpeed = options.initialSpeed && options.initialSpeed > 0 ? options.initialSpeed : 1;
+    const fallbackState = stateForPlacement(options.defaultPlacement ?? "bottom-right");
+    const initialState = {
+      position: isToolbarPoint((_a = options.initialState) == null ? void 0 : _a.position) ? options.initialState.position : fallbackState.position,
+      dockEdge: isToolbarDockEdge((_b = options.initialState) == null ? void 0 : _b.dockEdge) ? options.initialState.dockEdge : fallbackState.dockEdge,
+      isVertical: typeof ((_c = options.initialState) == null ? void 0 : _c.isVertical) === "boolean" ? options.initialState.isVertical : fallbackState.isVertical
+    };
     const host = document.createElement("div");
     let layoutMode = options.layout ?? "floating";
     host.className = "slowmo-toolbar";
@@ -868,7 +653,10 @@
     const speedButton = document.createElement("button");
     speedButton.className = "pill-half speed-half";
     speedButton.type = "button";
-    speedButton.setAttribute("aria-label", "Drag left or right to change speed");
+    speedButton.setAttribute(
+      "aria-label",
+      "Playback speed. Drag or use arrow keys to change; Home resets to 1×."
+    );
     const divider = document.createElement("span");
     divider.className = "pill-divider";
     divider.setAttribute("aria-hidden", "true");
@@ -881,11 +669,12 @@
     frame.appendChild(pill);
     shell.append(frame, closeButton);
     shadow.appendChild(shell);
-    let speedIndex = persisted.speedIndex;
-    let isPlaying = true;
-    let isVertical = persisted.isVertical;
-    let dockEdge = persisted.dockEdge;
-    let position = persisted.position;
+    let speedIndex = findClosestSpeedIndex(initialSpeed);
+    let isPlaying = !(options.initialPaused ?? false);
+    let isVertical = initialState.isVertical;
+    let dockEdge = initialState.dockEdge;
+    let position = initialState.position;
+    let activeAnchor = options.anchor ?? null;
     let isDragging = false;
     let didDrag = false;
     let isScrubbing = false;
@@ -927,6 +716,33 @@
         shell.style.transform = "translate(-50%, -50%)";
         return;
       }
+      if (activeAnchor == null ? void 0 : activeAnchor.isConnected) {
+        const rect = activeAnchor.getBoundingClientRect();
+        const dimensions = shellDimensions(false);
+        const gap = options.anchorGap ?? 12;
+        const side = options.anchorSide ?? "bottom";
+        const center = {
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2
+        };
+        if (side === "top") center.y = rect.top - gap - dimensions.height / 2;
+        if (side === "bottom") center.y = rect.bottom + gap + dimensions.height / 2;
+        if (side === "left") center.x = rect.left - gap - dimensions.width / 2;
+        if (side === "right") center.x = rect.right + gap + dimensions.width / 2;
+        dockEdge = "none";
+        isVertical = false;
+        const viewport = viewportSize();
+        position = {
+          xPct: viewport.width > 0 ? center.x / viewport.width : 0.5,
+          yPct: viewport.height > 0 ? center.y / viewport.height : 0.5
+        };
+        shell.style.left = `${center.x}px`;
+        shell.style.top = `${center.y}px`;
+        shell.style.transform = "translate(-50%, -50%)";
+        return;
+      } else if (activeAnchor) {
+        activeAnchor = null;
+      }
       position = clampPosition(position);
       const { width, height } = viewportSize();
       shell.style.left = `${position.xPct * width}px`;
@@ -934,16 +750,12 @@
       shell.style.transform = "translate(-50%, -50%)";
     }
     function saveState() {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({
-          speedPresetVersion: SPEED_PRESET_VERSION,
-          position,
-          speedIndex,
-          dockEdge,
-          isVertical
-        }));
-      } catch {
-      }
+      var _a2;
+      (_a2 = options.onStateChange) == null ? void 0 : _a2.call(options, {
+        position,
+        dockEdge,
+        isVertical
+      });
     }
     function renderPlayIcon() {
       playButton.replaceChildren(createIcon(isPlaying ? "pause" : "play"));
@@ -1009,12 +821,18 @@
     function updateSpeedIndex(nextIndex) {
       speedIndex = Math.max(0, Math.min(SPEEDS.length - 1, nextIndex));
       renderSpeed();
-      saveState();
       if (isPlaying) options.onSpeedChange(selectedSpeed());
+    }
+    function setPlaybackState(speed, paused = false) {
+      speedIndex = findClosestSpeedIndex(speed);
+      isPlaying = !paused && speed !== 0;
+      renderPlayIcon();
+      renderSpeed();
+      applySelectedSpeed();
     }
     function clearTooltip() {
       if (tooltipTimer) {
-        clearTimeout(tooltipTimer);
+        clock.clearTimeout(tooltipTimer);
         tooltipTimer = null;
       }
       tooltip == null ? void 0 : tooltip.remove();
@@ -1022,7 +840,7 @@
     }
     function showTooltipDelayed(label, control) {
       clearTooltip();
-      tooltipTimer = setTimeout(() => {
+      tooltipTimer = clock.setTimeout(() => {
         if (destroyed) return;
         const rect = control.getBoundingClientRect();
         const hasRoomAbove = rect.top > 30;
@@ -1053,6 +871,7 @@
       event.preventDefault();
       event.stopPropagation();
       clearTooltip();
+      activeAnchor = null;
       if (layoutMode === "inline") {
         const inlineRect = shell.getBoundingClientRect();
         const viewport = viewportSize();
@@ -1142,12 +961,12 @@
       }
       isDragging = false;
       shell.classList.remove("dragging");
-      window.setTimeout(() => {
+      clock.setTimeout(() => {
         didDrag = false;
       }, 0);
     }
     function beginSpeedScrub(event) {
-      var _a2, _b;
+      var _a2, _b2;
       if (event.button !== 0 || getHoverZone(event.clientX, event.clientY) !== "right") return;
       event.preventDefault();
       event.stopPropagation();
@@ -1172,7 +991,7 @@
       renderSpeed();
       try {
         const request = (_a2 = speedButton.requestPointerLock) == null ? void 0 : _a2.call(speedButton);
-        (_b = request == null ? void 0 : request.catch) == null ? void 0 : _b.call(request, () => void 0);
+        (_b2 = request == null ? void 0 : request.catch) == null ? void 0 : _b2.call(request, () => void 0);
       } catch {
       }
     }
@@ -1221,7 +1040,7 @@
       scrubPixelRemainder = 0;
       speedButton.classList.remove("scrubbing");
       fakeCursor.remove();
-      window.setTimeout(() => {
+      clock.setTimeout(() => {
         overscroll = 0;
         renderSpeed();
       }, 0);
@@ -1246,12 +1065,13 @@
       if (destroyed) return;
       destroyed = true;
       clearTooltip();
-      if (closeTimer) clearTimeout(closeTimer);
+      if (closeTimer) clock.clearTimeout(closeTimer);
       finishScrub();
       document.removeEventListener("mousemove", handleDocumentMouseMove);
       document.removeEventListener("mouseup", handleDocumentMouseUp);
       document.removeEventListener("pointerlockchange", handlePointerLockChange);
       window.removeEventListener("resize", handleResize);
+      window.removeEventListener("scroll", handleResize);
       try {
         if (host.matches(":popover-open")) host.hidePopover();
       } catch {
@@ -1259,16 +1079,19 @@
       host.remove();
     }
     function close() {
+      var _a2, _b2;
       if (destroyed || frame.classList.contains("leaving")) return;
       clearTooltip();
       isPlaying = true;
+      (_a2 = options.onPauseToggle) == null ? void 0 : _a2.call(options, false);
       options.onSpeedChange(1);
+      (_b2 = options.onClose) == null ? void 0 : _b2.call(options);
       frame.classList.remove("entering");
       frame.classList.add("leaving");
-      closeTimer = setTimeout(() => {
-        var _a2;
-        (_a2 = options.onClose) == null ? void 0 : _a2.call(options);
+      closeTimer = clock.setTimeout(() => {
+        var _a3;
         destroy();
+        (_a3 = options.onClosed) == null ? void 0 : _a3.call(options);
       }, 180);
     }
     function handleDocumentMouseMove(event) {
@@ -1300,9 +1123,11 @@
     playButton.addEventListener("mouseleave", clearTooltip);
     playButton.addEventListener("mousedown", (event) => event.stopPropagation());
     playButton.addEventListener("click", (event) => {
+      var _a2;
       event.stopPropagation();
       isPlaying = !isPlaying;
       renderPlayIcon();
+      (_a2 = options.onPauseToggle) == null ? void 0 : _a2.call(options, !isPlaying);
       applySelectedSpeed();
     });
     speedButton.addEventListener("mouseenter", () => {
@@ -1311,6 +1136,21 @@
     speedButton.addEventListener("mouseleave", clearTooltip);
     speedButton.addEventListener("mousedown", beginSpeedScrub);
     speedButton.addEventListener("dblclick", () => updateSpeedIndex(ONE_X_SPEED_INDEX));
+    speedButton.addEventListener("keydown", (event) => {
+      let nextIndex = null;
+      if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
+        nextIndex = speedIndex - 1;
+      } else if (event.key === "ArrowRight" || event.key === "ArrowUp") {
+        nextIndex = speedIndex + 1;
+      } else if (event.key === "Home") {
+        nextIndex = ONE_X_SPEED_INDEX;
+      } else if (event.key === "End") {
+        nextIndex = SPEEDS.length - 1;
+      }
+      if (nextIndex === null) return;
+      event.preventDefault();
+      updateSpeedIndex(nextIndex);
+    });
     closeButton.addEventListener("mouseenter", () => {
       showTooltipDelayed("Hide the toolbar", closeButton);
     });
@@ -1324,77 +1164,282 @@
     document.addEventListener("mouseup", handleDocumentMouseUp);
     document.addEventListener("pointerlockchange", handlePointerLockChange);
     window.addEventListener("resize", handleResize);
+    window.addEventListener("scroll", handleResize, { passive: true });
     renderPlayIcon();
     renderSpeed();
     renderOrientation();
     updatePosition();
     applySelectedSpeed();
-    window.setTimeout(() => frame.classList.remove("entering"), 220);
+    clock.setTimeout(() => frame.classList.remove("entering"), 220);
     if (layoutMode === "floating") queueMicrotask(elevateFloatingToolbar);
+    host.close = close;
     host.destroy = destroy;
+    host.setPlaybackState = setPlaybackState;
     return host;
   }
-  const SYNC_MESSAGE = "slowmo-extension-sync";
-  const READY_MESSAGE = "slowmo-extension-ready";
-  const TRIGGER_EVENT = "slowmo-extension-trigger";
-  const isTopFrame = window === window.top;
-  if (window.__slowmoExtensionLoaded) {
-    (_a = window.__slowmoShowToolbar) == null ? void 0 : _a.call(window);
-  } else {
-    let broadcastSpeed = function(speed) {
-      currentSpeed2 = speed;
-      slowmo(speed);
-      for (let index = 0; index < window.frames.length; index += 1) {
-        window.frames[index].postMessage({ type: SYNC_MESSAGE, speed }, "*");
-      }
-    }, showToolbar = function() {
-      if (!isTopFrame || (toolbar == null ? void 0 : toolbar.isConnected)) return;
-      if (!document.body) {
-        setTimeout(showToolbar, 50);
-        return;
-      }
-      toolbar = createDial({
-        onSpeedChange: (speed) => {
-          broadcastSpeed(speed);
-        },
-        onPauseToggle: (_paused) => {
-        },
-        onClose: () => {
-          toolbar = null;
-        },
-        initialSpeed: 1,
-        initialPaused: false
-      });
-      document.body.appendChild(toolbar);
+  const DEFAULT_STORAGE_KEY = "slowmo-toolbar-placement-v1";
+  const DEFAULT_TOOLBAR_SHORTCUT = "Mod+Shift+S";
+  function normalizeState(value) {
+    if (!value) return {};
+    return {
+      position: isToolbarPoint(value.position) ? value.position : void 0,
+      dockEdge: isToolbarDockEdge(value.dockEdge) ? value.dockEdge : void 0,
+      isVertical: typeof value.isVertical === "boolean" ? value.isVertical : void 0
     };
-    window.__slowmoExtensionLoaded = true;
-    let currentSpeed2 = 1;
-    let toolbar = null;
-    window.addEventListener("message", (event) => {
-      const message = event.data;
-      if (!message || typeof message !== "object") return;
-      if (message.type === SYNC_MESSAGE && event.source === window.parent && typeof message.speed === "number") {
-        broadcastSpeed(message.speed);
+  }
+  function createLocalStorageToolbarPersistence(key = DEFAULT_STORAGE_KEY) {
+    return {
+      load() {
+        if (typeof localStorage === "undefined") return null;
+        try {
+          const raw = localStorage.getItem(key);
+          return raw ? normalizeState(JSON.parse(raw)) : null;
+        } catch {
+          return null;
+        }
+      },
+      save(state) {
+        if (typeof localStorage === "undefined") return;
+        try {
+          localStorage.setItem(key, JSON.stringify(state));
+        } catch {
+        }
+      }
+    };
+  }
+  function eventMatchesShortcut(event, shortcut) {
+    const parts = shortcut.split("+").map((part) => part.trim().toLowerCase()).filter(Boolean);
+    const key = parts.find(
+      (part) => !["mod", "meta", "command", "cmd", "control", "ctrl", "alt", "option", "shift"].includes(part)
+    );
+    if (!key || event.key.toLowerCase() !== key) return false;
+    const isApple = typeof navigator !== "undefined" && /mac|iphone|ipad|ipod/i.test(navigator.platform);
+    const expectsMod = parts.includes("mod");
+    const expectsMeta = parts.some((part) => ["meta", "command", "cmd"].includes(part)) || expectsMod && isApple;
+    const expectsCtrl = parts.some((part) => ["control", "ctrl"].includes(part)) || expectsMod && !isApple;
+    const expectsAlt = parts.some((part) => ["alt", "option"].includes(part));
+    const expectsShift = parts.includes("shift");
+    return event.metaKey === expectsMeta && event.ctrlKey === expectsCtrl && event.altKey === expectsAlt && event.shiftKey === expectsShift;
+  }
+  function isEditableTarget(target) {
+    return target instanceof Element && Boolean(target.closest('input, textarea, select, [contenteditable="true"]'));
+  }
+  function createSlowmoToolbarHost(options) {
+    const controller = options.controller;
+    let currentOptions = { ...options };
+    let element = null;
+    let openState = false;
+    let destroyed = false;
+    const host = {
+      controller,
+      open() {
+        var _a;
+        if (destroyed || typeof document === "undefined") return null;
+        if (openState && (element == null ? void 0 : element.isConnected)) return element;
+        if (element) {
+          element.destroy();
+          element = null;
+        }
+        controller.reset();
+        openState = true;
+        const persistence = currentOptions.persistence === false ? null : currentOptions.persistence ?? createLocalStorageToolbarPersistence();
+        const initialState = normalizeState((persistence == null ? void 0 : persistence.load()) ?? null);
+        const nextElement = createDial({
+          layout: currentOptions.layout,
+          defaultPlacement: currentOptions.defaultPlacement,
+          initialState,
+          anchor: currentOptions.anchor,
+          anchorSide: currentOptions.anchorSide,
+          anchorGap: currentOptions.anchorGap,
+          initialSpeed: 1,
+          initialPaused: false,
+          onSpeedChange: (speed) => controller.setSpeed(speed),
+          onClose: () => {
+            var _a2;
+            if (element !== nextElement) return;
+            openState = false;
+            controller.destroy();
+            (_a2 = currentOptions.onOpenChange) == null ? void 0 : _a2.call(currentOptions, false);
+          },
+          onClosed: () => {
+            if (element === nextElement) element = null;
+          },
+          clock: currentOptions.clock,
+          onStateChange: (state) => {
+            const activePersistence = currentOptions.persistence === false ? null : currentOptions.persistence ?? createLocalStorageToolbarPersistence();
+            activePersistence == null ? void 0 : activePersistence.save(state);
+          }
+        });
+        element = nextElement;
+        (currentOptions.mountTarget ?? document.body).appendChild(nextElement);
+        (_a = currentOptions.onOpenChange) == null ? void 0 : _a.call(currentOptions, true);
+        return nextElement;
+      },
+      close() {
+        if (!openState) {
+          controller.destroy();
+          return;
+        }
+        element == null ? void 0 : element.close();
+      },
+      toggle() {
+        if (openState) host.close();
+        else host.open();
+      },
+      reset() {
+        if (element && openState) {
+          element.setPlaybackState(1, false);
+        } else {
+          controller.reset();
+        }
+      },
+      update(nextOptions) {
+        if (destroyed) return;
+        const previousDefaultOpen = currentOptions.defaultOpen;
+        currentOptions = { ...currentOptions, ...nextOptions, controller };
+        if (nextOptions.mountTarget && element && element.parentElement !== nextOptions.mountTarget) {
+          nextOptions.mountTarget.appendChild(element);
+        }
+        if (nextOptions.defaultOpen !== previousDefaultOpen) {
+          if (nextOptions.defaultOpen === false) host.close();
+          if (nextOptions.defaultOpen === true) host.open();
+        }
+      },
+      destroy() {
+        if (destroyed) return;
+        destroyed = true;
+        if (typeof window !== "undefined") {
+          window.removeEventListener("keydown", handleKeyDown);
+        }
+        element == null ? void 0 : element.destroy();
+        element = null;
+        openState = false;
+        controller.destroy();
+      },
+      isOpen() {
+        return openState;
+      },
+      getElement() {
+        return element;
+      }
+    };
+    function handleKeyDown(event) {
+      const shortcut = currentOptions.shortcut === void 0 ? DEFAULT_TOOLBAR_SHORTCUT : currentOptions.shortcut;
+      if (!shortcut || event.defaultPrevented || event.repeat || isEditableTarget(event.target) || !eventMatchesShortcut(event, shortcut)) {
         return;
       }
-      if (message.type === READY_MESSAGE && event.source) {
-        event.source.postMessage(
-          { type: SYNC_MESSAGE, speed: currentSpeed2 },
-          { targetOrigin: "*" }
-        );
-      }
-    });
-    if (!isTopFrame) {
-      window.parent.postMessage({ type: READY_MESSAGE }, "*");
+      event.preventDefault();
+      host.toggle();
     }
-    window.__slowmoShowToolbar = showToolbar;
-    if (isTopFrame) {
-      window.addEventListener(TRIGGER_EVENT, showToolbar);
-      if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", showToolbar, { once: true });
-      } else {
-        showToolbar();
-      }
+    if (typeof window !== "undefined") {
+      window.addEventListener("keydown", handleKeyDown);
     }
+    if (currentOptions.defaultOpen !== false) host.open();
+    return host;
   }
+  const COMMAND_EVENT = "slowmo-extension-command-v1";
+  const COMMAND_MESSAGE = "slowmo-extension-command-message-v1";
+  const SESSION_ENDED_MESSAGE = "slowmo-extension-session-ended-v1";
+  const STORAGE_KEY = "toolbarPlacementV1";
+  function dispatchCommand(command) {
+    document.dispatchEvent(new CustomEvent(COMMAND_EVENT, { detail: command }));
+    void chrome.runtime.sendMessage({
+      type: COMMAND_MESSAGE,
+      sessionToken: window.__slowmoExtensionSessionTokenV1,
+      command: command.command,
+      ...command.command === "set-speed" ? {
+        speed: Number.isFinite(command.speed) ? command.speed : "infinity"
+      } : {}
+    });
+  }
+  function createBridgeController() {
+    let snapshot = {
+      status: "inactive",
+      speed: 1,
+      paused: false
+    };
+    const subscribers = /* @__PURE__ */ new Set();
+    function emit() {
+      for (const subscriber of subscribers) subscriber(snapshot);
+    }
+    const controller = {
+      activate() {
+        if (snapshot.status === "active") return;
+        snapshot = { status: "active", speed: 1, paused: false };
+        dispatchCommand({ command: "set-speed", speed: 1 });
+        emit();
+      },
+      setSpeed(speed) {
+        controller.activate();
+        snapshot = {
+          status: "active",
+          speed,
+          paused: speed === 0
+        };
+        dispatchCommand({ command: "set-speed", speed });
+        emit();
+      },
+      pause() {
+        controller.setSpeed(0);
+      },
+      play() {
+        controller.setSpeed(snapshot.speed > 0 ? snapshot.speed : 1);
+      },
+      reset() {
+        controller.setSpeed(1);
+      },
+      destroy() {
+        if (snapshot.status === "inactive") return;
+        dispatchCommand({ command: "deactivate" });
+        snapshot = { status: "inactive", speed: 1, paused: false };
+        emit();
+        void chrome.runtime.sendMessage({
+          type: SESSION_ENDED_MESSAGE,
+          sessionToken: window.__slowmoExtensionSessionTokenV1
+        });
+      },
+      getSpeed() {
+        return snapshot.speed;
+      },
+      getSnapshot() {
+        return snapshot;
+      },
+      subscribe(subscriber) {
+        subscribers.add(subscriber);
+        subscriber(snapshot);
+        return () => subscribers.delete(subscriber);
+      }
+    };
+    return controller;
+  }
+  async function waitForBody() {
+    if (document.body) return;
+    await new Promise((resolve) => {
+      document.addEventListener("DOMContentLoaded", () => resolve(), { once: true });
+    });
+  }
+  async function mountToolbar() {
+    await waitForBody();
+    if (window.__slowmoExtensionToolbarHostV1) {
+      window.__slowmoExtensionToolbarHostV1.reset();
+      window.__slowmoExtensionToolbarHostV1.open();
+      return;
+    }
+    const stored = await chrome.storage.local.get(STORAGE_KEY);
+    let cachedState = stored[STORAGE_KEY] ?? null;
+    const persistence = {
+      load: () => cachedState,
+      save: (state) => {
+        cachedState = state;
+        void chrome.storage.local.set({ [STORAGE_KEY]: state });
+      }
+    };
+    window.__slowmoExtensionToolbarHostV1 = createSlowmoToolbarHost({
+      controller: createBridgeController(),
+      persistence,
+      shortcut: false,
+      defaultPlacement: "bottom-right"
+    });
+  }
+  void mountToolbar();
 })();

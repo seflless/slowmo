@@ -1,31 +1,37 @@
 {
   "name": "slowmo",
-  "version": "0.16.2",
+  "version": "0.17.0",
   "description": "Universal slow-motion control for web animations - CSS, videos, GSAP, Three.js, and more",
   "type": "module",
+  "sideEffects": false,
   "main": "./dist/slowmo.cjs",
   "module": "./dist/slowmo.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/slowmo.js",
-      "require": "./dist/slowmo.cjs",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/slowmo.cjs"
     },
     "./dial": {
+      "types": "./dist/dial-api.d.ts",
       "import": "./dist/dial.js",
-      "require": "./dist/dial.cjs",
-      "types": "./dist/dial-api.d.ts"
+      "require": "./dist/dial.cjs"
+    },
+    "./toolbar": {
+      "types": "./dist/toolbar.d.ts",
+      "import": "./dist/toolbar.js",
+      "require": "./dist/toolbar.cjs"
     },
     "./react": {
+      "types": "./dist/react.d.ts",
       "import": "./dist/react.js",
-      "require": "./dist/react.cjs",
-      "types": "./dist/react.d.ts"
+      "require": "./dist/react.cjs"
     },
     "./recreate": {
+      "types": "./dist/recreate.d.ts",
       "import": "./dist/recreate.js",
-      "require": "./dist/recreate.cjs",
-      "types": "./dist/recreate.d.ts"
+      "require": "./dist/recreate.cjs"
     }
   },
   "bin": {
@@ -40,14 +46,14 @@
     "dev": "vite demo",
     "build": "vite build",
     "build:demo": "vite build --config vite.demo.config.ts",
-    "build:ext": "vite build --config vite.extension.config.ts",
+    "build:ext": "vite build --config vite.extension.config.ts --mode runtime && vite build --config vite.extension.config.ts --mode toolbar && vite build --config vite.extension.config.ts --mode background",
     "zip:extension": "rm -f ./slowmo-extension.zip && cd extension && zip -r ../slowmo-extension.zip . -x '*.DS_Store' -x 'store-assets/*'",
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
     "test:watch": "vitest",
     "test:e2e": "playwright test --config tests/e2e/playwright.config.ts",
     "test:e2e:ui": "playwright test --config tests/e2e/playwright.config.ts --ui",
-    "test:e2e:extension": "playwright test --config tests/e2e/extension/extension.config.ts",
+    "test:e2e:extension": "bun run build:ext && playwright test --config tests/e2e/extension/extension.config.ts",
     "test:all": "npm run test:unit && npm run test:e2e",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build",
@@ -78,11 +84,15 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.42.0",
+    "@types/chrome": "^0.2.2",
     "@types/node": "^20.11.0",
     "@types/react": "^19.2.10",
+    "@types/react-dom": "^19.2.3",
     "@vitest/coverage-v8": "^1.2.1",
     "jsdom": "^24.0.0",
     "motion": "12.6.4",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
     "typescript": "^5.3.3",
     "vite": "^5.0.11",
     "vite-plugin-dts": "^3.7.1",
@@ -90,7 +100,7 @@
   },
   "peerDependencies": {
     "gsap": ">=3.0.0",
-    "react": ">=16.8.0"
+    "react": ">=18.0.0"
   },
   "peerDependenciesMeta": {
     "gsap": {

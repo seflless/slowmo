@@ -1,100 +1,137 @@
 /**
- * slowmo Chrome Extension - Content Script
- *
- * Built from TypeScript source. Injects slowmo into every frame and creates one
- * top-level toolbar that controls the full frame tree.
+ * Main-world runtime bridge. The background service worker injects this file
+ * into every eligible frame only after the user invokes Slowmo.
  */
 
-import { slowmo } from '../index';
-import { createDial } from '../dial';
+import { createSlowmoController, type SlowmoController } from '../index';
+import {
+  COMMAND_EVENT,
+  FRAME_MESSAGE,
+  READY_MESSAGE,
+  type ExtensionCommand,
+  type FrameMessage,
+} from './protocol';
 
-// Extend Window interface for our flag
+interface ExtensionRuntime {
+  controller: SlowmoController;
+  sessionToken: string;
+  setSpeed(speed: number): void;
+  deactivate(): void;
+}
+
 declare global {
   interface Window {
-    __slowmoExtensionLoaded?: boolean;
-    __slowmoShowToolbar?: () => void;
+    __slowmoExtensionRuntimeV1?: ExtensionRuntime;
+    __slowmoExtensionSessionTokenV1?: string;
   }
 }
 
-const SYNC_MESSAGE = 'slowmo-extension-sync';
-const READY_MESSAGE = 'slowmo-extension-ready';
-const TRIGGER_EVENT = 'slowmo-extension-trigger';
 const isTopFrame = window === window.top;
 
-if (window.__slowmoExtensionLoaded) {
-  // An extension-action click can execute the entry point again.
-  window.__slowmoShowToolbar?.();
-} else {
-  window.__slowmoExtensionLoaded = true;
+function sendToChildren(command: ExtensionCommand): void {
+  const message: FrameMessage = { type: FRAME_MESSAGE, command };
+  for (let index = 0; index < window.frames.length; index += 1) {
+    window.frames[index].postMessage(message, '*');
+  }
+}
+
+function createRuntime(sessionToken: string): ExtensionRuntime {
+  const controller = createSlowmoController();
   let currentSpeed = 1;
-  let toolbar: HTMLElement | null = null;
+  let deactivated = false;
 
-  function broadcastSpeed(speed: number) {
-    currentSpeed = speed;
-    slowmo(speed);
+  function apply(command: ExtensionCommand, broadcast = true): void {
+    if (deactivated) return;
 
-    for (let index = 0; index < window.frames.length; index += 1) {
-      window.frames[index].postMessage({ type: SYNC_MESSAGE, speed }, '*');
+    if (command.command === 'set-speed') {
+      currentSpeed = command.speed;
+      controller.setSpeed(command.speed);
+      if (broadcast) sendToChildren(command);
+      return;
+    }
+
+    if (broadcast) sendToChildren(command);
+    deactivated = true;
+    controller.destroy();
+    document.removeEventListener(COMMAND_EVENT, handleToolbarCommand);
+    window.removeEventListener('message', handleFrameMessage);
+    delete window.__slowmoExtensionRuntimeV1;
+  }
+
+  function handleToolbarCommand(event: Event): void {
+    if (!isTopFrame || !(event instanceof CustomEvent)) return;
+    const detail = event.detail as ExtensionCommand | null;
+    if (!detail || typeof detail !== 'object') return;
+    if (detail.command === 'deactivate') apply(detail);
+    if (
+      detail.command === 'set-speed'
+      && typeof detail.speed === 'number'
+      && detail.speed >= 0
+    ) {
+      apply(detail);
     }
   }
 
-  window.addEventListener('message', (event) => {
-    const message = event.data as { type?: unknown; speed?: unknown } | null;
+  function handleFrameMessage(event: MessageEvent): void {
+    const message = event.data as FrameMessage | {
+      type?: unknown;
+    } | null;
     if (!message || typeof message !== 'object') return;
 
-    if (
-      message.type === SYNC_MESSAGE
-      && event.source === window.parent
-      && typeof message.speed === 'number'
-    ) {
-      broadcastSpeed(message.speed);
+    if (message.type === FRAME_MESSAGE && !isTopFrame && 'command' in message) {
+      const command = message.command;
+      if (
+        command.command === 'deactivate'
+        || (
+          command.command === 'set-speed'
+          && typeof command.speed === 'number'
+          && command.speed >= 0
+        )
+      ) {
+        apply(command, true);
+      }
       return;
     }
 
     if (message.type === READY_MESSAGE && event.source) {
-      (event.source as Window).postMessage(
-        { type: SYNC_MESSAGE, speed: currentSpeed },
-        { targetOrigin: '*' },
-      );
+      (event.source as Window).postMessage({
+        type: FRAME_MESSAGE,
+        command: { command: 'set-speed', speed: currentSpeed },
+      } satisfies FrameMessage, { targetOrigin: '*' });
     }
-  });
+  }
+
+  document.addEventListener(COMMAND_EVENT, handleToolbarCommand);
+  window.addEventListener('message', handleFrameMessage);
+  controller.reset();
 
   if (!isTopFrame) {
     window.parent.postMessage({ type: READY_MESSAGE }, '*');
   }
 
-  function showToolbar() {
-    if (!isTopFrame || toolbar?.isConnected) return;
-    if (!document.body) {
-      setTimeout(showToolbar, 50);
-      return;
-    }
+  return {
+    controller,
+    sessionToken,
+    setSpeed(speed) {
+      apply({ command: 'set-speed', speed });
+    },
+    deactivate() {
+      apply({ command: 'deactivate' });
+    },
+  };
+}
 
-    toolbar = createDial({
-      onSpeedChange: (speed) => {
-        broadcastSpeed(speed);
-      },
-      onPauseToggle: (_paused) => {
-        // Handled via onSpeedChange(0) for pause
-      },
-      onClose: () => {
-        toolbar = null;
-      },
-      initialSpeed: 1,
-      initialPaused: false,
-    });
-
-    document.body.appendChild(toolbar);
-  }
-
-  window.__slowmoShowToolbar = showToolbar;
-
-  if (isTopFrame) {
-    window.addEventListener(TRIGGER_EVENT, showToolbar);
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', showToolbar, { once: true });
-    } else {
-      showToolbar();
-    }
-  }
+const sessionToken = window.__slowmoExtensionSessionTokenV1;
+if (!sessionToken) {
+  // Runtime and token injection are separate Chrome operations. If a
+  // navigation lands between them, never activate in the new document.
+  window.__slowmoExtensionRuntimeV1?.deactivate();
+} else if (
+  window.__slowmoExtensionRuntimeV1
+  && window.__slowmoExtensionRuntimeV1.sessionToken === sessionToken
+) {
+  window.__slowmoExtensionRuntimeV1.setSpeed(1);
+} else {
+  window.__slowmoExtensionRuntimeV1?.deactivate();
+  window.__slowmoExtensionRuntimeV1 = createRuntime(sessionToken);
 }

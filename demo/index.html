@@ -105,6 +105,16 @@
         color: var(--text);
       }
 
+      .section-nav {
+        justify-content: center;
+        flex-wrap: wrap;
+        margin: 1.5rem 0 2.5rem;
+      }
+
+      section[id] {
+        scroll-margin-top: 2rem;
+      }
+
       /* Hero */
       .hero {
         text-align: center;
@@ -507,6 +517,10 @@
         margin-bottom: 4rem;
       }
 
+      .api-section + .api-section {
+        margin-top: -1rem;
+      }
+
       .api-section h2 {
         font-size: 0.875rem;
         font-weight: 600;
@@ -524,6 +538,18 @@
         padding: 1.25rem;
         max-width: 400px;
         margin: 0 auto;
+      }
+
+      .api-intro {
+        max-width: 560px;
+        margin: -0.5rem auto 1.25rem;
+        color: var(--text-muted);
+        text-align: center;
+        font-size: 0.9rem;
+      }
+
+      .api-card.wide {
+        max-width: 680px;
       }
 
       .api-card pre {
@@ -559,6 +585,21 @@
 
       .api-card code .comment {
         color: var(--text-dim);
+      }
+
+      .api-source {
+        margin-top: 0.875rem;
+        text-align: right;
+      }
+
+      .api-source a {
+        color: var(--text-muted);
+        font-size: 0.8125rem;
+        text-decoration: none;
+      }
+
+      .api-source a:hover {
+        color: var(--text);
       }
 
       /* Credits */
@@ -733,6 +774,13 @@
           Debug animations, study cool demos, and make games easier or harder.
         </p>
 
+        <nav class="nav section-nav" aria-label="Page sections">
+          <a href="#try-it">Try it</a>
+          <a href="#demos">Demos</a>
+          <a href="#headless">Headless</a>
+          <a href="#react-component">React Component</a>
+        </nav>
+
         <h2 style="margin-bottom: 1rem">Quick Start</h2>
         <div class="install-options">
           <div class="install-box">
@@ -803,8 +851,9 @@
       </section>
 
       <!-- Try It Controller -->
-      <section class="controller-section fade-up" data-slowmo-exclude>
+      <section id="try-it" class="controller-section fade-up" data-slowmo-exclude>
         <h2
+          id="try-it-heading"
           style="
             margin-bottom: 1rem;
             text-transform: none;
@@ -824,7 +873,7 @@
       </section>
 
       <!-- Demos -->
-      <section class="demos-section">
+      <section id="demos" class="demos-section">
         <div class="demos-grid">
           <div class="demo-card">
             <div class="demo-visual">
@@ -883,8 +932,8 @@
         </div>
       </section>
 
-      <!-- API -->
-      <section class="api-section fade-up" data-slowmo-exclude>
+      <!-- Headless API -->
+      <section id="headless" class="api-section fade-up" data-slowmo-exclude>
         <h2
           style="
             margin-bottom: 1rem;
@@ -895,20 +944,52 @@
             color: var(--text);
           "
         >
-          Full API
+          Headless
         </h2>
-        <div class="api-card api-full">
-          <pre><code><span class="keyword">import</span> slowmo <span class="keyword">from</span> <span class="string">"slowmo"</span>
+        <p class="api-intro">
+          Use the controller directly when you want to build your own UI or
+          combine Slowmo with an existing debug menu.
+        </p>
+        <div class="api-card wide">
+          <pre><code><span class="keyword">import</span> { createSlowmoController } <span class="keyword">from</span> <span class="string">"slowmo"</span>
 
-slowmo(<span class="number">0.5</span>)           <span class="comment">// half speed</span>
-slowmo(<span class="number">2</span>)             <span class="comment">// double speed</span>
-slowmo(<span class="number">0</span>)             <span class="comment">// pause</span>
-slowmo(<span class="number">1</span>)             <span class="comment">// normal</span>
+<span class="keyword">const</span> slowmo = <span class="function">createSlowmoController</span>()
 
-slowmo.<span class="function">pause</span>()        <span class="comment">// pause all</span>
-slowmo.<span class="function">play</span>()         <span class="comment">// resume</span>
-slowmo.<span class="function">reset</span>()        <span class="comment">// back to 1×</span>
-slowmo.<span class="function">getSpeed</span>()     <span class="comment">// current speed</span></code></pre>
+slowmo.<span class="function">setSpeed</span>(<span class="number">0.5</span>)
+slowmo.<span class="function">pause</span>()
+slowmo.<span class="function">play</span>()
+slowmo.<span class="function">destroy</span>() <span class="comment">// restore native timing</span></code></pre>
+          <p class="api-source">
+            <a href="https://github.com/seflless/slowmo/blob/main/examples/headless-vanilla.js">View source</a>
+          </p>
+        </div>
+      </section>
+
+      <!-- React -->
+      <section id="react-component" class="api-section fade-up" data-slowmo-exclude>
+        <h2>React Component</h2>
+        <p class="api-intro">
+          Import React support only when you need it. The hook is headless, so
+          the controls can match the rest of your product.
+        </p>
+        <div class="api-card wide">
+          <pre><code><span class="keyword">import</span> { useSlowmo } <span class="keyword">from</span> <span class="string">"slowmo/react"</span>
+
+<span class="keyword">function</span> <span class="function">PlaybackControls</span>() {
+  <span class="keyword">const</span> { speed, setSpeed, pause, reset } = <span class="function">useSlowmo</span>()
+
+  <span class="keyword">return</span> (
+    &lt;div&gt;
+      &lt;output&gt;{speed}×&lt;/output&gt;
+      &lt;button onClick={() =&gt; setSpeed(<span class="number">0.5</span>)}&gt;Slow down&lt;/button&gt;
+      &lt;button onClick={pause}&gt;Pause&lt;/button&gt;
+      &lt;button onClick={reset}&gt;Reset&lt;/button&gt;
+    &lt;/div&gt;
+  )
+}</code></pre>
+          <p class="api-source">
+            <a href="https://github.com/seflless/slowmo/blob/main/examples/PlaybackControls.tsx">View source</a>
+          </p>
         </div>
       </section>
 
@@ -963,7 +1044,7 @@ slowmo.<span class="function">getSpeed</span>()     <span class="comment">// cur
 
     <script type="module">
       import { slowmo } from "../src/index.ts";
-      import { createDial } from "../src/dial.ts";
+      import { createSlowmoToolbar } from "../src/toolbar.ts";
       import { animate } from "motion";
 
       // Copy install command
@@ -988,24 +1069,18 @@ slowmo.<span class="function">getSpeed</span>()     <span class="comment">// cur
       const toolbarContainer = document.getElementById("toolbar-container");
       const toolbarReopen = document.getElementById("toolbar-reopen");
 
-      function mountToolbar() {
-        toolbarReopen.hidden = true;
-        const toolbar = createDial({
-          layout: "inline",
-          onSpeedChange: (speed) => {
-            slowmo(speed);
-          },
-          onClose: () => {
-            toolbarReopen.hidden = false;
-          },
-          initialSpeed: slowmo.getSpeed() || 1,
-          initialPaused: slowmo.getSpeed() === 0,
-        });
-        toolbarContainer.prepend(toolbar);
-      }
+      const toolbar = createSlowmoToolbar({
+        controller: slowmo,
+        anchor: document.getElementById("try-it-heading"),
+        anchorSide: "bottom",
+        anchorGap: 8,
+        persistence: false,
+        onOpenChange: (open) => {
+          toolbarReopen.hidden = open;
+        },
+      });
 
-      toolbarReopen.addEventListener("click", mountToolbar);
-      mountToolbar();
+      toolbarReopen.addEventListener("click", () => toolbar.open());
 
       // Explicitly start the muted local demo once it can play. Some browser
       // automation and power-saving modes do not honor the autoplay attribute.
