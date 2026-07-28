@@ -502,8 +502,13 @@
       }
 
       .motion-box {
-        background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
-        cursor: pointer;
+        background:
+          radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.42), transparent 32%),
+          linear-gradient(135deg, #c4b5fd 0%, #8b5cf6 58%, #6d28d9 100%);
+        box-shadow:
+          0 12px 24px rgba(124, 58, 237, 0.3),
+          inset 0 1px 1px rgba(255, 255, 255, 0.38);
+        will-change: transform;
       }
 
       .demo-visual video {
@@ -926,7 +931,7 @@
             </div>
             <div class="demo-label">
               <h3>Motion</h3>
-              <p>Hover to animate</p>
+              <p>Figure-eight spring loop</p>
             </div>
           </div>
         </div>
@@ -1128,24 +1133,39 @@ slowmo.<span class="function">destroy</span>() <span class="comment">// restore 
         }
       );
 
-      // Motion library demo (hover animation). Motion is bundled with the
-      // demo so this remains functional without a runtime CDN dependency.
+      // Motion's JavaScript animate() API. Motion is the current unified
+      // library for the former Motion One and Framer Motion projects, and is
+      // bundled here so the demo has no runtime CDN dependency or user input.
       const motionBox = document.getElementById("motion-box");
-      motionBox.addEventListener("mouseenter", () => {
-        animate(
-          motionBox,
-          { scale: [null, 1.1, 1.5] },
-          { duration: 0.5, ease: "easeOut" }
-        );
-      });
+      const reducedMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)"
+      ).matches;
 
-      motionBox.addEventListener("mouseleave", () => {
+      if (reducedMotion) {
         animate(
           motionBox,
-          { scale: 1 },
-          { duration: 0.3, ease: "easeOut" }
+          { scale: [1, 1.06, 1] },
+          { duration: 2.4, ease: "easeInOut", repeat: Infinity }
         );
-      });
+      } else {
+        animate(
+          motionBox,
+          {
+            // Two loops meeting at the centre make the ∞ path.
+            x: [0, 26, 0, -26, 0, 26, 0, -26, 0],
+            y: [0, -14, -28, -14, 0, 14, 28, 14, 0],
+            rotate: [0, 10, 0, -10, 0, 10, 0, -10, 0],
+            scaleX: [1.06, 1.22, 1.02, 1.22, 1.06, 1.22, 1.02, 1.22, 1.06],
+            scaleY: [0.96, 0.86, 1.1, 0.86, 0.96, 0.86, 1.1, 0.86, 0.96],
+          },
+          {
+            duration: 3.6,
+            times: [0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1],
+            ease: "easeInOut",
+            repeat: Infinity,
+          }
+        );
+      }
     </script>
   </body>
 </html>
